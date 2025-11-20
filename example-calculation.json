@@ -1,0 +1,59 @@
+{
+  "toleranceMode": "symmetric",
+  "directions": [
+    {
+      "id": "dir-1",
+      "name": "B-Direction",
+      "items": [
+        {
+          "id": "item-1",
+          "name": "Letter Profile",
+          "tolerancePlus": 0.5,
+          "toleranceMinus": 0.5,
+          "isFloat": false
+        },
+        {
+          "id": "item-2",
+          "name": "Foam Edge",
+          "tolerancePlus": 1.5,
+          "toleranceMinus": 1.5,
+          "isFloat": false
+        },
+        {
+          "id": "item-3",
+          "name": "Plasman Nest",
+          "tolerancePlus": 0.5,
+          "toleranceMinus": 0.5,
+          "isFloat": true
+        }
+      ]
+    },
+    {
+      "id": "dir-2",
+      "name": "H-Direction",
+      "items": [
+        {
+          "id": "item-4",
+          "name": "Letter Profile",
+          "tolerancePlus": 0.5,
+          "toleranceMinus": 0.5,
+          "isFloat": false
+        },
+        {
+          "id": "item-5",
+          "name": "Foam Edge",
+          "tolerancePlus": 0.5,
+          "toleranceMinus": 0.5,
+          "isFloat": false
+        },
+        {
+          "id": "item-6",
+          "name": "Plasman Nest",
+          "tolerancePlus": 0.5,
+          "toleranceMinus": 0.5,
+          "isFloat": true
+        }
+      ]
+    }
+  ]
+}
