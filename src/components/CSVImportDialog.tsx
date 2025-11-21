@@ -210,7 +210,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
           : Math.max(0, parseFloat(row[minusIndex] || '0') || 0);
 
         // Parse float factor
-        let floatFactor = FLOAT_FACTORS.FIXED;
+        let floatFactor: number = FLOAT_FACTORS.FIXED;
         if (floatIndex >= 0 && row[floatIndex]) {
           const floatValue = row[floatIndex].toLowerCase().trim();
           if (floatValue === 'true' || floatValue === '1' || floatValue === 'yes' || floatValue.includes('√3')) {

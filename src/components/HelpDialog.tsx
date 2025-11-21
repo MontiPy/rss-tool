@@ -8,7 +8,6 @@ import {
   IconButton,
   Typography,
   Box,
-  Divider,
   Accordion,
   AccordionSummary,
   AccordionDetails,

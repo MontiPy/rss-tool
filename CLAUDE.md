@@ -68,7 +68,6 @@ ProjectMetadata {
 
 AnalysisSettings {
   calculationMode: 'rss' | 'worstCase'  // Calculation method
-  sigmaLevel: 3 | 4 | 5 | 6             // For future statistical features
   showMultiUnit: boolean                 // Display results in multiple units
   secondaryUnit?: ToleranceUnit          // Unit for multi-unit display
   contributionThreshold: number          // Percentage threshold for high-impact warnings (default: 40)
@@ -175,7 +174,6 @@ importFromJSON(file)  // Validates toleranceMode & directions exist
   },
   "analysisSettings": {
     "calculationMode": "rss",
-    "sigmaLevel": 3,
     "showMultiUnit": true,
     "secondaryUnit": "inches",
     "contributionThreshold": 40,
@@ -493,7 +491,6 @@ Unicode escapes don't render correctly in JSX strings.
 ```typescript
 {
   calculationMode: 'rss',
-  sigmaLevel: 3,
   showMultiUnit: false,
   contributionThreshold: 40,  // Percentage for high-impact warnings
   sensitivityIncrement: 0.1,  // Slider step size

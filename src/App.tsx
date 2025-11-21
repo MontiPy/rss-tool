@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Container,
   AppBar,
@@ -382,7 +382,6 @@ function App() {
         unit={projectData.unit || 'mm'}
         analysisSettings={projectData.analysisSettings || {
           calculationMode: 'rss',
-          sigmaLevel: 3,
           showMultiUnit: false,
           contributionThreshold: 40,
           sensitivityIncrement: 0.1,

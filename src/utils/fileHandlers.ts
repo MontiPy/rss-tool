@@ -40,7 +40,6 @@ export function importFromJSON(file: File): Promise<ProjectData> {
           },
           analysisSettings: {
             calculationMode: data.analysisSettings?.calculationMode || 'rss',
-            sigmaLevel: data.analysisSettings?.sigmaLevel || 3,
             showMultiUnit: data.analysisSettings?.showMultiUnit || false,
             contributionThreshold: data.analysisSettings?.contributionThreshold || 40,
             sensitivityIncrement: data.analysisSettings?.sensitivityIncrement || 0.1,
