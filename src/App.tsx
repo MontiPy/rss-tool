@@ -15,6 +15,8 @@ import {
   Radio,
   Paper,
   IconButton,
+  createTheme,
+  ThemeProvider,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -26,6 +28,17 @@ import DirectionTab from './components/DirectionTab';
 import FileControls from './components/FileControls';
 import ProjectMetadataEditor from './components/ProjectMetadataEditor';
 import HelpDialog from './components/HelpDialog';
+
+// Custom theme with Yu Gothic font and increased font size
+const theme = createTheme({
+  typography: {
+    fontFamily: "'Yu Gothic', 'Yu Gothic UI', 'Segoe UI', 'Helvetica Neue', sans-serif",
+    fontSize: 13,
+  },
+});
+
+// Monospace font for numeric values
+export const MONOSPACE_FONT = "'Consolas', 'Monaco', 'Courier New', monospace";
 
 function App() {
   const [projectData, setProjectData] = useState<ProjectData>({
@@ -44,7 +57,6 @@ function App() {
     },
     analysisSettings: {
       calculationMode: 'rss',
-      sigmaLevel: 3,
       showMultiUnit: false,
       contributionThreshold: 40,
       sensitivityIncrement: 0.1,
@@ -174,7 +186,8 @@ function App() {
   };
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
+    <ThemeProvider theme={theme}>
+      <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
@@ -383,7 +396,8 @@ function App() {
         open={helpOpen}
         onClose={() => setHelpOpen(false)}
       />
-    </Box>
+      </Box>
+    </ThemeProvider>
   );
 }
 

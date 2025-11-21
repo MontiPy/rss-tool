@@ -15,6 +15,8 @@ import {
   Tooltip,
   LinearProgress,
   Button,
+  Grid,
+  Divider,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
@@ -23,6 +25,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import { RSSResult, ToleranceUnit, CalculationMode, AnalysisSettings, ToleranceItem } from '../types';
 import { formatWithMultiUnit } from '../utils/rssCalculator';
 import SensitivityAnalysisDialog from './SensitivityAnalysisDialog';
+import { MONOSPACE_FONT } from '../App';
 
 interface ResultsDisplayProps {
   result: RSSResult | null;
@@ -46,6 +49,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   analysisSettings,
 }) => {
   const [showContributions, setShowContributions] = useState(false);
+  const [showStatistical, setShowStatistical] = useState(false);
   const [sensitivityOpen, setSensitivityOpen] = useState(false);
 
   const showMultiUnit = analysisSettings?.showMultiUnit || false;
@@ -132,7 +136,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 : `+${formatValue(totalPlus)} / -${formatValue(totalMinus)}`
             }
             color="primary"
-            sx={{ fontWeight: 'bold' }}
+            sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}
           />
         </Box>
 
@@ -185,6 +189,140 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         )}
       </Box>
 
+      {/* Statistical Analysis Section */}
+      {result.statistical && calculationMode === 'rss' && (
+        <>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'action.hover' },
+              borderRadius: 1,
+              px: 1,
+              py: 0.5,
+              mt: 2,
+            }}
+            onClick={() => setShowStatistical(!showStatistical)}
+          >
+            <Typography variant="caption" sx={{ flexGrow: 1 }}>
+              <strong>Process Capability Analysis</strong>
+            </Typography>
+            <IconButton
+              size="small"
+              sx={{
+                transform: showStatistical ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.3s',
+              }}
+            >
+              <ExpandMoreIcon fontSize="small" />
+            </IconButton>
+          </Box>
+
+          <Collapse in={showStatistical}>
+            <Box sx={{ mt: 1, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                    Current 3σ RSS
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}>
+                    ±{formatValue(result.statistical.current3Sigma)}
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                    Current Process Capability (Cpk)
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Chip
+                      label={`Cpk = ${result.statistical.currentCpk.toFixed(2)}`}
+                      color={
+                        result.statistical.currentCpk >= 1.66
+                          ? 'success'
+                          : result.statistical.currentCpk >= 1.33
+                          ? 'success'
+                          : result.statistical.currentCpk >= 1.0
+                          ? 'warning'
+                          : 'error'
+                      }
+                      size="small"
+                      icon={result.statistical.currentCpk < 1.33 ? <WarningIcon /> : undefined}
+                      sx={{ fontFamily: MONOSPACE_FONT }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {result.statistical.currentCpk >= 1.66
+                        ? 'Highly capable (≥1.66)'
+                        : result.statistical.currentCpk >= 1.33
+                        ? 'Capable (≥1.33)'
+                        : result.statistical.currentCpk >= 1.0
+                        ? 'Marginally capable (≥1.0)'
+                        : 'Incapable (<1.0)'}
+                    </Typography>
+                  </Box>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                    Estimated Yield
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Chip
+                      label={`${result.statistical.currentYield.toFixed(2)}%`}
+                      color={
+                        result.statistical.currentYield >= 99.73
+                          ? 'success'
+                          : result.statistical.currentYield >= 95
+                          ? 'warning'
+                          : 'error'
+                      }
+                      size="small"
+                      sx={{ fontFamily: MONOSPACE_FONT }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      of parts meet target specification
+                    </Typography>
+                  </Box>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+                    Capability Targets
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                    Required 3σ for Cpk = 1.33 (Capable Process)
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}>
+                    ±{formatValue(result.statistical.required3SigmaFor1_33Cpk)}
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                    Required 3σ for Cpk = 1.66 (Highly Capable Process)
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}>
+                    ±{formatValue(result.statistical.required3SigmaFor1_66Cpk)}
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                    Note: Analysis assumes input tolerances are 3σ values and normal distribution
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          </Collapse>
+        </>
+      )}
+
       {itemContributions.length > 1 && (
         <>
           <Box
@@ -231,13 +369,14 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 </TableHead>
                 <TableBody>
                   {contributionsWithPercent.map((contribution) => {
-                    const isHighImpact = contribution.percentPlus > 40;
+                    const threshold = analysisSettings?.contributionThreshold || 40;
+                    const isHighImpact = contribution.percentPlus > threshold;
                     return (
                       <TableRow key={contribution.itemId}>
                         <TableCell sx={{ py: 0.5 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             {isHighImpact && (
-                              <Tooltip title="High impact item (>40% of total)">
+                              <Tooltip title={`High impact item (>${threshold}% of total)`}>
                                 <WarningIcon fontSize="small" color="warning" />
                               </Tooltip>
                             )}

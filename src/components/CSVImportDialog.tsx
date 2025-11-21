@@ -204,10 +204,10 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
         const notesIndex = columnMapping.notes ? parseInt(columnMapping.notes) : -1;
         const sourceIndex = columnMapping.source ? parseInt(columnMapping.source) : -1;
 
-        const tolerancePlus = parseFloat(row[plusIndex] || '0') || 0;
+        const tolerancePlus = Math.max(0, parseFloat(row[plusIndex] || '0') || 0);
         const toleranceMinus = isSymmetricMode
           ? tolerancePlus
-          : (parseFloat(row[minusIndex] || '0') || 0);
+          : Math.max(0, parseFloat(row[minusIndex] || '0') || 0);
 
         // Parse float factor
         let floatFactor = FLOAT_FACTORS.FIXED;

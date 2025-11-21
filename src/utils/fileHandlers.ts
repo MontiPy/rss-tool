@@ -52,6 +52,9 @@ export function importFromJSON(file: File): Promise<ProjectData> {
             targetBudget: dir.targetBudget || undefined, // Optional field
             items: dir.items.map((item) => ({
               ...item,
+              // Ensure tolerances are non-negative
+              tolerancePlus: Math.max(0, item.tolerancePlus || 0),
+              toleranceMinus: Math.max(0, item.toleranceMinus || 0),
               // Migrate isFloat (boolean) to floatFactor (number)
               floatFactor: item.floatFactor !== undefined
                 ? item.floatFactor

@@ -190,7 +190,7 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
             </Tooltip>
           </Grid>
 
-          {/* Analysis Settings Section */}
+          {/* Display Settings Section */}
           <Grid item xs={12}>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" gutterBottom>
@@ -249,6 +249,24 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
               type="number"
               inputProps={{ step: 0.01, min: 0.001 }}
               helperText="Increment step for sensitivity sliders"
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Contribution Threshold (%)"
+              value={editedSettings.contributionThreshold || 40}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 40;
+                setEditedSettings({
+                  ...editedSettings,
+                  contributionThreshold: Math.max(0, Math.min(100, value)),
+                });
+              }}
+              fullWidth
+              type="number"
+              inputProps={{ step: 1, min: 0, max: 100 }}
+              helperText="Percentage threshold for high-impact item warnings (default: 40%)"
             />
           </Grid>
         </Grid>

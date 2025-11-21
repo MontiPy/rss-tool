@@ -140,3 +140,69 @@ export function formatWithMultiUnit(
   const secondaryValue = convertUnit(value, primaryUnit, secondaryUnit).toFixed(decimals);
   return `${primaryValue} ${primaryUnit} (${secondaryValue} ${secondaryUnit})`;
 }
+
+/**
+ * Calculate statistical analysis for tolerance results
+ * Note: Input tolerances are assumed to represent 3σ values (industry standard)
+ *
+ * @param rssValue - The RSS total value (3σ)
+ * @param targetBudget - Target tolerance budget
+ * @returns Statistical analysis data showing current Cpk and required 3σ for capability targets
+ */
+export function calculateStatisticalAnalysis(
+  rssValue: number,
+  targetBudget: number
+) {
+  // RSS result is 3σ (since input tolerances are 3σ)
+  const current3Sigma = rssValue;
+
+  // Convert to 1σ for Cpk calculation
+  const oneSigma = current3Sigma / 3;
+
+  // Current Process Capability Index (Cpk)
+  // Cpk = (USL - mean) / (3 * sigma)
+  // For centered process: Cpk = USL / (3 * sigma)
+  const currentCpk = targetBudget / (3 * oneSigma);
+
+  // Estimated yield using normal distribution approximation
+  // Z-score = (targetBudget - 0) / oneSigma
+  const zScore = targetBudget / oneSigma;
+  const currentYield = normalCDF(zScore) * 100;
+
+  // Calculate required 3σ values for target Cpk levels
+  // Rearranging Cpk = USL / (3 * sigma), we get: sigma = USL / (3 * Cpk)
+  // So 3σ = USL / Cpk
+  const required3SigmaFor1_33Cpk = targetBudget / 1.33;
+  const required3SigmaFor1_66Cpk = targetBudget / 1.66;
+
+  return {
+    current3Sigma,
+    currentCpk,
+    currentYield,
+    required3SigmaFor1_33Cpk,
+    required3SigmaFor1_66Cpk,
+  };
+}
+
+/**
+ * Approximate normal cumulative distribution function
+ * Uses the error function approximation
+ *
+ * @param z - The z-score
+ * @returns Probability (0 to 1)
+ */
+function normalCDF(z: number): number {
+  // Approximation using error function
+  // CDF(z) ≈ 0.5 * (1 + erf(z / sqrt(2)))
+
+  // For positive z-scores, use approximation
+  if (z >= 0) {
+    const t = 1 / (1 + 0.2316419 * z);
+    const d = 0.3989423 * Math.exp(-z * z / 2);
+    const prob = 1 - d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+    return prob;
+  } else {
+    // For negative z-scores, use symmetry
+    return 1 - normalCDF(-z);
+  }
+}

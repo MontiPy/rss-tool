@@ -5,7 +5,7 @@ import { Direction, ToleranceMode, ToleranceUnit, RSSResult, CalculationMode, An
 import ToleranceTable from './ToleranceTable';
 import ResultsDisplay from './ResultsDisplay';
 import CSVImportDialog from './CSVImportDialog';
-import { calculateTolerance } from '../utils/rssCalculator';
+import { calculateTolerance, calculateStatisticalAnalysis } from '../utils/rssCalculator';
 
 interface DirectionTabProps {
   direction: Direction;
@@ -31,6 +31,16 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
   useEffect(() => {
     if (direction.items.length > 0) {
       const result = calculateTolerance(direction.items, direction.id, direction.name, calculationMode);
+
+      // Add statistical analysis if target budget exists
+      if (direction.targetBudget && direction.targetBudget > 0 && calculationMode === 'rss') {
+        const statistical = calculateStatisticalAnalysis(
+          result.totalPlus,
+          direction.targetBudget
+        );
+        result.statistical = statistical;
+      }
+
       setRssResult(result);
     } else {
       setRssResult(null);
@@ -55,7 +65,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
     const value = parseFloat(targetBudget);
     onDirectionChange({
       ...direction,
-      targetBudget: isNaN(value) ? undefined : value,
+      targetBudget: isNaN(value) ? undefined : Math.max(0, value),
     });
   };
 

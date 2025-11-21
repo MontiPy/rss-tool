@@ -25,6 +25,7 @@ import NotesIcon from '@mui/icons-material/Notes';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { ToleranceItem, ToleranceMode } from '../types';
 import { FLOAT_FACTORS } from '../utils/rssCalculator';
+import { MONOSPACE_FONT } from '../App';
 
 interface ToleranceTableProps {
   items: ToleranceItem[];
@@ -145,11 +146,15 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                   <TextField
                     type="number"
                     value={item.tolerancePlus}
-                    onChange={(e) =>
-                      handleItemChange(item.id, 'tolerancePlus', parseFloat(e.target.value) || 0)
-                    }
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      handleItemChange(item.id, 'tolerancePlus', Math.max(0, value));
+                    }}
                     size="small"
-                    inputProps={{ step: 0.01 }}
+                    inputProps={{ step: 0.01, min: 0 }}
+                    error={item.tolerancePlus < 0}
+                    helperText={item.tolerancePlus < 0 ? 'Must be ≥ 0' : ''}
+                    sx={{ '& input': { fontFamily: MONOSPACE_FONT } }}
                   />
                 </TableCell>
                 {toleranceMode === 'asymmetric' && (
@@ -157,11 +162,15 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                     <TextField
                       type="number"
                       value={item.toleranceMinus}
-                      onChange={(e) =>
-                        handleItemChange(item.id, 'toleranceMinus', parseFloat(e.target.value) || 0)
-                      }
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        handleItemChange(item.id, 'toleranceMinus', Math.max(0, value));
+                      }}
                       size="small"
-                      inputProps={{ step: 0.01 }}
+                      inputProps={{ step: 0.01, min: 0 }}
+                      error={item.toleranceMinus < 0}
+                      helperText={item.toleranceMinus < 0 ? 'Must be ≥ 0' : ''}
+                      sx={{ '& input': { fontFamily: MONOSPACE_FONT } }}
                     />
                   </TableCell>
                 )}

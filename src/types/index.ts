@@ -11,7 +11,7 @@ export type CalculationMode = 'rss' | 'worstCase';
 /**
  * Statistical confidence level (sigma)
  */
-export type SigmaLevel = 1 | 2 | 3 | 6;
+export type SigmaLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
  * Supported units for tolerance values
@@ -63,7 +63,6 @@ export interface ProjectMetadata {
  */
 export interface AnalysisSettings {
   calculationMode: CalculationMode; // RSS or Worst-Case
-  sigmaLevel: SigmaLevel; // Statistical confidence level (1σ, 2σ, 3σ, 6σ)
   showMultiUnit: boolean; // Display results in multiple units
   secondaryUnit?: ToleranceUnit; // Secondary unit for multi-unit display
   contributionThreshold: number; // Alert threshold for high-impact items (default: 40%)
@@ -97,6 +96,14 @@ export interface RSSResult {
     contributionPlus: number;
     contributionMinus: number;
   }[];
+  // Statistical analysis (optional, only shown if targetBudget exists)
+  statistical?: {
+    current3Sigma: number; // Current 3σ RSS result
+    currentCpk: number; // Current process capability
+    currentYield: number; // Estimated yield percentage
+    required3SigmaFor1_33Cpk: number; // 3σ needed for Cpk = 1.33
+    required3SigmaFor1_66Cpk: number; // 3σ needed for Cpk = 1.66
+  };
 }
 
 /**

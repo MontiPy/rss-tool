@@ -82,11 +82,19 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
     setAdjustedItems(
       adjustedItems.map((item) => {
         if (item.id === itemId) {
+          // Ensure tolerances never go below 0
+          const newTolerancePlus = Math.max(0, item.originalTolerancePlus + adjustmentValue);
+          const newToleranceMinus = Math.max(0, item.originalToleranceMinus + adjustmentValue);
+
+          // Limit adjustment if it would cause negative tolerance
+          const maxNegativeAdjustment = Math.max(-item.originalTolerancePlus, -item.originalToleranceMinus);
+          const clampedAdjustment = Math.max(maxNegativeAdjustment, adjustmentValue);
+
           return {
             ...item,
-            tolerancePlus: item.originalTolerancePlus + adjustmentValue,
-            toleranceMinus: item.originalToleranceMinus + adjustmentValue,
-            adjustmentValue,
+            tolerancePlus: newTolerancePlus,
+            toleranceMinus: newToleranceMinus,
+            adjustmentValue: clampedAdjustment,
           };
         }
         return item;
@@ -310,6 +318,8 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                         value={selectedItem.adjustmentValue.toFixed(3)}
                         onChange={(e) => handleAdjustment(selectedItem.id, parseFloat(e.target.value) || 0)}
                         step={increment}
+                        min={-selectedItem.originalTolerancePlus}
+                        title={`Minimum: ${(-selectedItem.originalTolerancePlus).toFixed(3)} (cannot go below 0 tolerance)`}
                         style={{
                           padding: '8px',
                           fontSize: '14px',
@@ -320,19 +330,22 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                       />
                       <Typography variant="body2">{unit}</Typography>
                     </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                      Range: {(-selectedItem.originalTolerancePlus).toFixed(3)} to unlimited (tolerance cannot go below 0)
+                    </Typography>
                   </Box>
 
                   <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
-                    Or use slider (range: -5 to +5 {unit})
+                    Or use slider (min: {(-selectedItem.originalTolerancePlus).toFixed(3)}, max: +5 {unit})
                   </Typography>
                   <Slider
                     value={selectedItem.adjustmentValue}
                     onChange={(_, value) => handleAdjustment(selectedItem.id, value as number)}
-                    min={-5}
+                    min={Math.max(-5, -selectedItem.originalTolerancePlus)}
                     max={5}
                     step={increment}
                     marks={[
-                      { value: -5, label: '-5' },
+                      { value: Math.max(-5, -selectedItem.originalTolerancePlus), label: Math.max(-5, -selectedItem.originalTolerancePlus).toFixed(1) },
                       { value: 0, label: '0' },
                       { value: 5, label: '+5' },
                     ]}
@@ -341,13 +354,21 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                     sx={{ mt: 4, mb: 2 }}
                   />
 
+                  {selectedItem.tolerancePlus === 0 && (
+                    <Alert severity="error" sx={{ mb: 1 }}>
+                      <Typography variant="caption">
+                        <strong>Warning:</strong> Tolerance is at minimum (0 {unit}). Cannot reduce further.
+                      </Typography>
+                    </Alert>
+                  )}
+
                   <Alert severity={selectedItem.adjustmentValue < 0 ? 'success' : selectedItem.adjustmentValue > 0 ? 'warning' : 'info'}>
                     {selectedItem.adjustmentValue === 0 && (
                       <Typography variant="caption">
                         Use the slider to adjust this tolerance and see the impact on the total RSS.
                       </Typography>
                     )}
-                    {selectedItem.adjustmentValue < 0 && (
+                    {selectedItem.adjustmentValue < 0 && selectedItem.tolerancePlus > 0 && (
                       <Typography variant="caption">
                         <strong>Tightening tolerance</strong> by {Math.abs(selectedItem.adjustmentValue).toFixed(3)} {unit} reduces the total RSS.
                       </Typography>
