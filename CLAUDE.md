@@ -518,3 +518,157 @@ UNIT_TO_MM = {
   mils: 0.0254
 }
 ```
+
+## TODO: User Profiles & Cloud Templates (Future Feature)
+
+**Status:** Planned (Not Implemented)
+**Last Updated:** 2025-01-24
+
+### Overview
+
+Implement user authentication with Microsoft OAuth and cloud storage for saving tolerance templates, stack templates, and projects using Firebase as the backend.
+
+### Architecture Decisions
+
+- **Backend:** Firebase (Backend-as-a-Service)
+- **Authentication:** Microsoft OAuth via Firebase Authentication custom provider
+- **Database:** Firestore (NoSQL, JSON-native)
+- **Features:** Tolerance item templates, stack templates, project templates, sharing with other users
+
+### Implementation Plan
+
+#### Phase 1: Firebase & Azure Setup (Infrastructure)
+1. Create Firebase project and install Firebase SDK dependencies (`firebase` v10+)
+2. Create Azure AD app registration for Microsoft OAuth (tenant, client ID, redirect URIs)
+3. Configure Firebase Authentication with Microsoft as custom OAuth provider
+4. Design Firestore database schema for users, projects, templates (3 collections)
+5. Set up Firestore security rules for user-scoped data access
+
+#### Phase 2: Authentication Integration (Frontend)
+6. Create authentication context (AuthContext.tsx) with login/logout/user state
+7. Build login screen with "Sign in with Microsoft" button
+8. Add auth state to App.tsx - protect main app behind authentication
+9. Create user profile component showing user info and logout button
+10. Handle auth redirects and token refresh for seamless session management
+
+#### Phase 3: Cloud Storage Integration
+11. Create Firebase service layer (firebaseService.ts) with CRUD operations
+12. Update ProjectData to include userId and cloudId fields for syncing
+13. Replace local file save/load with cloud save/load using Firestore
+14. Add "My Projects" list view showing all user's saved projects
+15. Implement auto-save with draft/published states
+
+#### Phase 4: Template System - Item Templates
+16. Create ToleranceItemTemplate type and Firestore collection
+17. Build ItemTemplateManager component - list, create, edit, delete templates
+18. Add "Insert from Template" button in ToleranceTable
+19. Implement template search/filter by category and tags
+
+#### Phase 5: Template System - Stack Templates
+20. Create StackTemplate type (complete Direction) and collection
+21. Build StackTemplateManager component with preview functionality
+22. Add "Save as Stack Template" button in DirectionTab
+23. Add "Load Stack Template" to replace/append items
+
+#### Phase 6: Template System - Project Templates
+24. Create ProjectTemplate type (complete ProjectData) and collection
+25. Build ProjectTemplateManager component with thumbnail previews
+26. Add "Save as Project Template" in settings menu
+27. Add "New from Template" in project list view
+
+#### Phase 7: Sharing Features
+28. Add sharing permissions (private/public/shared-with-users) to all template types
+29. Create TemplateGallery component showing public templates from all users
+30. Implement "Share with specific users" via email lookup
+31. Add "Duplicate template" for users to copy shared templates
+
+#### Phase 8: Migration & Polish
+32. Build JSON import wizard to migrate existing files to cloud
+33. Add offline support with local caching using IndexedDB
+34. Update CLAUDE.md with new architecture documentation
+35. Add loading states and error handling throughout
+
+### Proposed Database Schema
+
+```
+Firestore Collections:
+├── users/{userId}
+│   ├── displayName: string
+│   ├── email: string
+│   ├── createdAt: timestamp
+│   └── preferences: { defaultUnit, theme, ... }
+│
+├── projects/{projectId}
+│   ├── ownerId: string (userId)
+│   ├── projectData: ProjectData (full object)
+│   ├── sharing: 'private' | 'public' | 'shared'
+│   ├── sharedWith: string[] (userIds)
+│   ├── createdAt: timestamp
+│   └── modifiedAt: timestamp
+│
+├── templates/
+│   ├── items/{templateId}
+│   │   ├── ownerId: string
+│   │   ├── name: string
+│   │   ├── category: string
+│   │   ├── tags: string[]
+│   │   ├── item: ToleranceItem
+│   │   ├── sharing: 'private' | 'public'
+│   │   └── usageCount: number
+│   │
+│   ├── stacks/{templateId}
+│   │   ├── ownerId: string
+│   │   ├── name: string
+│   │   ├── category: string
+│   │   ├── direction: Direction
+│   │   ├── sharing: 'private' | 'public'
+│   │   └── usageCount: number
+│   │
+│   └── projects/{templateId}
+│       ├── ownerId: string
+│       ├── name: string
+│       ├── description: string
+│       ├── projectData: ProjectData
+│       ├── thumbnail?: string (base64)
+│       ├── sharing: 'private' | 'public'
+│       └── usageCount: number
+```
+
+### New Components Required
+
+| Component | Purpose |
+|-----------|---------|
+| `AuthContext.tsx` | Authentication state provider |
+| `LoginScreen.tsx` | Microsoft OAuth sign-in UI |
+| `UserProfile.tsx` | User info display and logout |
+| `ProjectList.tsx` | Cloud project browser |
+| `ItemTemplateManager.tsx` | Manage tolerance item templates |
+| `StackTemplateManager.tsx` | Manage stack templates |
+| `ProjectTemplateManager.tsx` | Manage project templates |
+| `TemplateGallery.tsx` | Browse public/shared templates |
+
+### New Utility Files Required
+
+| File | Purpose |
+|------|---------|
+| `src/services/firebaseConfig.ts` | Firebase initialization |
+| `src/services/firebaseService.ts` | Firestore CRUD operations |
+| `src/services/authService.ts` | Authentication helpers |
+| `src/types/templates.ts` | Template type definitions |
+
+### Dependencies to Add
+
+```json
+{
+  "firebase": "^10.x",
+  "@azure/msal-browser": "^3.x"  // Optional: enhanced Microsoft auth
+}
+```
+
+### Azure AD Setup Notes
+
+When implementing, create Azure AD app registration with:
+- Supported account types: "Accounts in any organizational directory and personal Microsoft accounts"
+- Redirect URI: `https://<your-domain>/__/auth/handler` (Firebase Auth handler)
+- API permissions: `User.Read` (Microsoft Graph)
+- Generate client secret for Firebase configuration
