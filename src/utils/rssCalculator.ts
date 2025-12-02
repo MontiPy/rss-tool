@@ -206,3 +206,17 @@ function normalCDF(z: number): number {
     return 1 - normalCDF(-z);
   }
 }
+
+/**
+ * Normal probability density function (PDF)
+ * Used to generate smooth distribution curves for visualization
+ *
+ * @param x - The value at which to evaluate the PDF
+ * @param mean - The mean (μ) of the distribution
+ * @param std - The standard deviation (σ) of the distribution
+ * @returns The probability density at x
+ */
+export function normalPdf(x: number, mean: number, std: number): number {
+  const z = (x - mean) / std;
+  return Math.exp(-0.5 * z * z) / (std * Math.sqrt(2 * Math.PI));
+}

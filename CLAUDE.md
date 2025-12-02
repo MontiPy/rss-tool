@@ -78,7 +78,8 @@ Direction {
   id: string
   name: string               // "B-Direction", "H-Direction", etc.
   description?: string       // Optional description (e.g., "Envelope height from base to top")
-  targetBudget?: number      // Optional tolerance budget target (triggers color-coded status)
+  usl?: number              // Upper Specification Limit (positive tolerance limit)
+  lsl?: number              // Lower Specification Limit (negative tolerance limit)
   items: ToleranceItem[]     // Tolerance stack items
 }
 
@@ -184,7 +185,8 @@ importFromJSON(file)  // Validates toleranceMode & directions exist
       "id": "dir-1",
       "name": "B-Direction",
       "description": "Envelope width from left to right edge",
-      "targetBudget": 2.5,
+      "usl": 2.5,
+      "lsl": -2.5,
       "items": [
         {
           "id": "item-1",
@@ -210,36 +212,41 @@ importFromJSON(file)  // Validates toleranceMode & directions exist
 }
 ```
 
-**Backward Compatibility:** The `importFromJSON` function automatically adds default values for missing metadata fields when loading older files, ensuring compatibility. Legacy `isFloat: boolean` fields are automatically migrated to `floatFactor: number`.
+**Backward Compatibility:** The `importFromJSON` function automatically adds default values for missing metadata fields when loading older files, ensuring compatibility. Legacy `isFloat: boolean` fields are automatically migrated to `floatFactor: number`. Legacy `targetBudget` fields are automatically converted to symmetric `usl` and `lsl` values (usl = targetBudget, lsl = -targetBudget).
 
 ## Phase 2 Features
 
-### Budget Comparison & Status Indicators
+### Specification Limits & Status Indicators
 
-**Target Budget Setting:**
-- Each Direction can have an optional `targetBudget` field
-- Set via TextField in DirectionTab (top-right of description area)
-- When set, ResultsDisplay shows color-coded budget status
+**USL/LSL Setting:**
+- Each Direction can have optional specification limits:
+  - `usl` (Upper Specification Limit): positive tolerance limit
+  - `lsl` (Lower Specification Limit): negative tolerance limit
+- Set via two TextFields in DirectionTab (top-right of description area)
+- Can be asymmetric (e.g., USL = +0.5, LSL = -0.3) or symmetric (e.g., USL = +2.5, LSL = -2.5)
+- LSL is always stored as a negative value internally
+- When set, ResultsDisplay shows color-coded status for each limit
 
-**Budget Status Logic:**
+**Specification Status Logic:**
 ```typescript
-budgetUtilization = (totalRSS / targetBudget) × 100
+uslUtilization = (totalPlus / usl) × 100
+lslUtilization = (totalMinus / |lsl|) × 100
 
-Status Colors:
-- Green (Pass):    < 90% of budget
-- Yellow (Warning): 90-100% of budget
-- Red (Fail):      > 100% of budget
+Status Colors (checked independently for USL and LSL):
+- Green (Pass):    < 90% of limit
+- Yellow (Warning): 90-100% of limit
+- Red (Fail):      > 100% of limit
 ```
 
 **Visual Indicators:**
-- Chip showing percentage utilization with status color
+- Separate chips for USL and LSL showing percentage utilization with status color
 - Warning icon for yellow/red status
-- Text showing amount over budget when failing
+- Text showing amount over limit when failing (for each limit independently)
 
 ### Calculation Mode Toggle
 
 **Global Setting (App.tsx):**
-- Radio buttons in control panel: "RSS (Statistical)" | "Worst-Case"
+- Radio buttons in control panel: "RSS (Statistical)" | "Worst-Case" | "Monte Carlo"
 - Affects all directions simultaneously
 - Stored in `analysisSettings.calculationMode`
 
@@ -247,6 +254,49 @@ Status Colors:
 - Shows current mode in results header
 - RSS mode: also displays worst-case comparison with savings calculation
 - Worst-case mode: shows only arithmetic sum result
+- Monte Carlo mode: displays 95th percentile with full distribution analysis
+
+### Monte Carlo Simulation
+
+**Configuration (ProjectMetadataEditor):**
+- Iteration count: 10k / 50k (default) / 100k / Custom (1k-1M)
+- Advanced mode toggle: Per-item distribution selection
+- Stored in `analysisSettings.monteCarloSettings`
+
+**Distribution Logic:**
+- **Auto mode** (default): Normal distribution for fixed items (floatFactor=1.0), Uniform for floating items (floatFactor≈√3)
+- **Advanced mode**: User selects Normal/Uniform/Triangular per item via dropdown in ToleranceTable
+
+**Visualization:**
+- Final stack histogram (50 bins) - **bilateral distribution** centered at 0
+- **Smooth PDF curve overlay** - Normal distribution curve (300 samples) fitted to histogram data, scaled and normalized to match histogram height
+- LSL (Lower Spec Limit) and USL (Upper Spec Limit) reference lines at specified limits (if set)
+- Mean (μ) reference line with green dashed marker
+- Percentile table (5th, 50th, 95th, 99th, mean, stdDev)
+- Risk analysis: probability of exceeding USL and/or LSL independently, plus total out-of-spec probability
+- Individual item histograms (30 bins each, bilateral, collapsible section) with PDF curve overlays (200 samples each)
+
+**Calculation:**
+- Runs N iterations (default: 50,000)
+- Each iteration samples from item distributions, calculates **linear sum** (not RSS)
+- Deviations add algebraically: total = Σ(sampled_deviation × float_factor)
+- Results in **bilateral distribution** (can be positive or negative)
+- Main result shows ±3σ range (99.7% confidence interval)
+- Assumes tolerances represent ±3σ values (σ = tolerance/3 for normal)
+
+**Key Implementation Files:**
+- `src/utils/monteCarloCalculator.ts` - Core simulation engine
+- `src/components/ResultsDisplay.tsx` - Histogram visualizations using Recharts ComposedChart (Bar + Line)
+- `src/utils/rssCalculator.ts` - Contains `normalPdf()` function for curve generation
+- `src/types/index.ts` - MonteCarloResult, HistogramBin, PercentileData types
+
+**PDF Curve Implementation:**
+- Uses `normalPdf(x, mean, std)` function: `exp(-0.5 * ((x - mean) / std)^2) / (std * sqrt(2π))`
+- Generates 300 sample points for final stack, 200 for individual items
+- Normalized to match histogram scale: `scaleFactor = maxHistFreq / maxPdfValue`
+- Rendered using Recharts `ComposedChart` with `Bar` (histogram) and `Line` (curve) components
+- Styling: Blue curve (#1976d2, strokeWidth 2), semi-transparent gray bars (rgba(150,150,150,0.5))
+- Reference lines: Red LSL/USL (#d62728, dashed 4 4), Green mean (#2ca02c, dashed 2 2)
 
 ### Multi-Unit Display
 
@@ -327,7 +377,7 @@ mils:   0.0254     (1 mil = 0.001 inch = 0.0254 mm)
 2. **Worst-Case Calculation** - Formula, comparison with RSS
 3. **Float Factors** - When to use 1.0 vs √3
 4. **Sensitivity Analysis** - Detailed explanation with examples
-5. **Tolerance Budget** - Status indicators (green/yellow/red)
+5. **Specification Limits (USL/LSL)** - Status indicators (green/yellow/red) for upper and lower limits
 6. **Symmetric vs Asymmetric** - Mode differences
 7. **File Operations** - Save, Load, Export CSV, Import CSV
 8. **Tips & Best Practices** - Usage recommendations
@@ -340,7 +390,7 @@ mils:   0.0254     (1 mil = 0.001 inch = 0.0254 mm)
 - **ToleranceTable:** Input fields clamp to min: 0, show error state if negative
 - **CSV Import:** `Math.max(0, parsedValue)` before creating items
 - **JSON Import:** Validates and clamps all tolerance values during load
-- **DirectionTab:** Target budget validated >= 0
+- **DirectionTab:** USL validated >= 0, LSL stored as negative value (user inputs absolute value)
 - **SensitivityAnalysisDialog:**
   - Adjustment calculations prevent negative results
   - Slider range dynamically limited
@@ -419,9 +469,9 @@ Heavy reliance on MUI for professional UI components (Tables, Tabs, Chips, TextF
 |-----------|---------------|-------|--------------|
 | `App.tsx` | Root state holder, tab management, direction CRUD, global settings | `projectData`, `activeTab`, `settingsOpen`, `helpOpen` | App bar with project name, Settings & Help icons, calculation mode toggle |
 | `ProjectMetadataEditor.tsx` | Edit project metadata, units, and analysis settings | `editedMetadata`, `selectedUnit`, `editedSettings` | Dialog with auto-dates, multi-unit config, sensitivity increment |
-| `DirectionTab.tsx` | Grid container, description, target budget, RSS calculation | `rssResult`, `csvImportOpen` (local) | Side-by-side layout, CSV import button, target budget field |
+| `DirectionTab.tsx` | Grid container, description, USL/LSL inputs, RSS calculation | `rssResult`, `csvImportOpen` (local) | Side-by-side layout, CSV import button, USL and LSL fields |
 | `ToleranceTable.tsx` | Editable 5-column table, add/remove/duplicate items, notes dialog | `notesDialogOpen`, `editingItem`, `editNotes`, `editSource` | Notes icon (blue when data), duplicate icon, validation min:0 |
-| `ResultsDisplay.tsx` | RSS/worst-case display, budget status, contributions, sensitivity | `showContributions`, `sensitivityOpen` (local) | Multi-unit support, budget chips (green/yellow/red), sensitivity button |
+| `ResultsDisplay.tsx` | RSS/worst-case display, spec limit status, contributions, sensitivity | `showContributions`, `sensitivityOpen` (local) | Multi-unit support, USL/LSL chips (green/yellow/red), sensitivity button |
 | `FileControls.tsx` | Save/load JSON, export/import CSV | `snackbar` (local) | Compact buttons with success/error feedback |
 | `CSVImportDialog.tsx` | 3-step CSV import with column mapping | `activeStep`, `csvData`, `columnMapping`, `previewItems` | Stepper UI, drag-drop upload, column mapping dropdowns, preview table |
 | `SensitivityAnalysisDialog.tsx` | Interactive tolerance adjustment analysis | `adjustedItems`, `selectedItemId`, `currentTotal` | Dual input (slider + direct), dynamic limits, real-time RSS update, sensitivity metric |
@@ -497,11 +547,15 @@ Unicode escapes don't render correctly in JSX strings.
 }
 ```
 
-**Budget Status Thresholds (ResultsDisplay.tsx:79-90):**
+**Specification Limit Status Thresholds (ResultsDisplay.tsx):**
 ```typescript
-< 90% of budget  → Green (pass)
-90-100% of budget → Yellow (warning)
-> 100% of budget  → Red (fail)
+< 90% of limit   → Green (pass)
+90-100% of limit → Yellow (warning)
+> 100% of limit  → Red (fail)
+
+// Applied independently to both USL and LSL
+// uslUtilization = (totalPlus / usl) × 100
+// lslUtilization = (totalMinus / |lsl|) × 100
 ```
 
 **Constants (rssCalculator.ts):**

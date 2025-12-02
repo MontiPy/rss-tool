@@ -174,6 +174,58 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
             </AccordionDetails>
           </Accordion>
 
+          {/* Monte Carlo Simulation */}
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6">Monte Carlo Simulation</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography variant="body2">
+                  Monte Carlo simulation provides probabilistic tolerance analysis by running thousands of random samples.
+                </Typography>
+
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    How it works:
+                  </Typography>
+                  <Box component="ul" sx={{ pl: 2, mt: 0 }}>
+                    <li>Each tolerance item is sampled from a probability distribution</li>
+                    <li>Deviations add algebraically (linear sum) for each sample (default: 50,000 iterations)</li>
+                    <li>Results aggregated into bilateral histogram and percentile statistics</li>
+                  </Box>
+                </Box>
+
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Distribution Types:
+                  </Typography>
+                  <Box component="ul" sx={{ pl: 2, mt: 0 }}>
+                    <li><strong>Normal:</strong> Used for controlled manufacturing processes (default for fixed items)</li>
+                    <li><strong>Uniform:</strong> Equal probability across tolerance range (default for floating items)</li>
+                    <li><strong>Triangular:</strong> Most likely at center, decreasing toward limits</li>
+                  </Box>
+                </Box>
+
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Reading Results:
+                  </Typography>
+                  <Box component="ul" sx={{ pl: 2, mt: 0 }}>
+                    <li><strong>±3σ Range:</strong> Captures 99.7% of all assemblies (shown in main result)</li>
+                    <li><strong>Median (50th):</strong> Typical assembly deviation (should be near zero)</li>
+                    <li><strong>Bilateral Histogram:</strong> Shows both positive and negative deviations</li>
+                    <li><strong>Risk Analysis:</strong> Probability of exceeding ±budget limits (LSL/USL)</li>
+                  </Box>
+                </Box>
+
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  Note: Assumes tolerances are ±3σ values (industry standard)
+                </Typography>
+              </Box>
+            </AccordionDetails>
+          </Accordion>
+
           {/* Float Factors */}
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>

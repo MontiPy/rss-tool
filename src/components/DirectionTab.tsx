@@ -6,6 +6,7 @@ import ToleranceTable from './ToleranceTable';
 import ResultsDisplay from './ResultsDisplay';
 import CSVImportDialog from './CSVImportDialog';
 import { calculateTolerance, calculateStatisticalAnalysis } from '../utils/rssCalculator';
+import { runMonteCarloSimulation } from '../utils/monteCarloCalculator';
 
 interface DirectionTabProps {
   direction: Direction;
@@ -26,26 +27,70 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
 }) => {
   const [rssResult, setRssResult] = useState<RSSResult | null>(null);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   // Recalculate whenever items or calculation mode changes
   useEffect(() => {
     if (direction.items.length > 0) {
-      const result = calculateTolerance(direction.items, direction.id, direction.name, calculationMode);
+      // Monte Carlo mode
+      if (calculationMode === 'monteCarlo') {
+        const mcSettings = analysisSettings?.monteCarloSettings || {
+          iterations: 50000,
+          useAdvancedDistributions: false,
+        };
 
-      // Add statistical analysis if target budget exists
-      if (direction.targetBudget && direction.targetBudget > 0 && calculationMode === 'rss') {
-        const statistical = calculateStatisticalAnalysis(
-          result.totalPlus,
-          direction.targetBudget
-        );
-        result.statistical = statistical;
+        // Show loading indicator
+        setIsCalculating(true);
+
+        // Defer calculation to allow UI update
+        setTimeout(() => {
+          const mcResult = runMonteCarloSimulation(
+            direction.items,
+            direction.id,
+            direction.name,
+            mcSettings,
+            direction.usl,
+            direction.lsl
+          );
+
+          // Wrap in RSSResult structure for compatibility
+          // For bilateral distribution, use 3σ (99.7% confidence) as representative value
+          const threeSigma = 3 * mcResult.percentiles.stdDev;
+          const result: RSSResult = {
+            directionId: direction.id,
+            directionName: direction.name,
+            totalPlus: threeSigma,
+            totalMinus: threeSigma,
+            itemContributions: mcResult.itemContributions.map(ic => ({
+              itemId: ic.itemId,
+              itemName: ic.itemName,
+              contributionPlus: ic.mean,
+              contributionMinus: ic.mean,
+            })),
+            monteCarloResult: mcResult,
+          };
+          setRssResult(result);
+          setIsCalculating(false);
+        }, 50); // Small delay to let UI update
+      } else {
+        // RSS or Worst-Case mode (existing code)
+        const result = calculateTolerance(direction.items, direction.id, direction.name, calculationMode);
+
+        // Add statistical analysis if USL exists
+        if (direction.usl && direction.usl > 0 && calculationMode === 'rss') {
+          const statistical = calculateStatisticalAnalysis(
+            result.totalPlus,
+            direction.usl
+          );
+          result.statistical = statistical;
+        }
+
+        setRssResult(result);
       }
-
-      setRssResult(result);
     } else {
       setRssResult(null);
     }
-  }, [direction, calculationMode]);
+  }, [direction, calculationMode, analysisSettings]);
 
   const handleItemsChange = (items: typeof direction.items) => {
     onDirectionChange({
@@ -61,11 +106,19 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
     });
   };
 
-  const handleTargetBudgetChange = (targetBudget: string) => {
-    const value = parseFloat(targetBudget);
+  const handleUSLChange = (usl: string) => {
+    const value = parseFloat(usl);
     onDirectionChange({
       ...direction,
-      targetBudget: isNaN(value) ? undefined : Math.max(0, value),
+      usl: isNaN(value) || value === 0 ? undefined : Math.max(0, value),
+    });
+  };
+
+  const handleLSLChange = (lsl: string) => {
+    const value = parseFloat(lsl);
+    onDirectionChange({
+      ...direction,
+      lsl: isNaN(value) || value === 0 ? undefined : -Math.abs(value), // Always store as negative
     });
   };
 
@@ -81,7 +134,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
     <Box sx={{ py: 1 }}>
       <Box sx={{ mb: 2 }}>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={8}>
+          <Grid item xs={12} md={6}>
             <TextField
               label="Tolerance Stack Description"
               value={direction.description || ''}
@@ -92,18 +145,32 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
               variant="outlined"
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} sm={6} md={3}>
             <TextField
-              label={`Target Budget (${unit})`}
-              value={direction.targetBudget !== undefined ? direction.targetBudget : ''}
-              onChange={(e) => handleTargetBudgetChange(e.target.value)}
+              label={`USL (${unit})`}
+              value={direction.usl !== undefined ? direction.usl : ''}
+              onChange={(e) => handleUSLChange(e.target.value)}
               fullWidth
               size="small"
               type="number"
-              placeholder="Optional"
+              placeholder="Upper Limit"
               variant="outlined"
               inputProps={{ step: 0.01, min: 0 }}
-              helperText="Optional tolerance target"
+              helperText="Upper spec limit"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              label={`LSL (${unit})`}
+              value={direction.lsl !== undefined ? Math.abs(direction.lsl) : ''}
+              onChange={(e) => handleLSLChange(e.target.value)}
+              fullWidth
+              size="small"
+              type="number"
+              placeholder="Lower Limit"
+              variant="outlined"
+              inputProps={{ step: 0.01, min: 0 }}
+              helperText="Lower spec limit (absolute)"
             />
           </Grid>
         </Grid>
@@ -133,9 +200,11 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
             directionId={direction.id}
             items={direction.items}
             unit={unit}
-            targetBudget={direction.targetBudget}
+            usl={direction.usl}
+            lsl={direction.lsl}
             calculationMode={calculationMode}
             analysisSettings={analysisSettings}
+            isCalculating={isCalculating}
           />
         </Grid>
       </Grid>

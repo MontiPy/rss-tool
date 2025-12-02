@@ -17,15 +17,27 @@ import {
   Button,
   Grid,
   Divider,
+  CircularProgress,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import WarningIcon from '@mui/icons-material/Warning';
 import TuneIcon from '@mui/icons-material/Tune';
 import { RSSResult, ToleranceUnit, CalculationMode, AnalysisSettings, ToleranceItem } from '../types';
-import { formatWithMultiUnit } from '../utils/rssCalculator';
+import { formatWithMultiUnit, normalPdf } from '../utils/rssCalculator';
 import SensitivityAnalysisDialog from './SensitivityAnalysisDialog';
 import { MONOSPACE_FONT } from '../App';
+import {
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  ComposedChart,
+  Line,
+} from 'recharts';
 
 interface ResultsDisplayProps {
   result: RSSResult | null;
@@ -33,9 +45,11 @@ interface ResultsDisplayProps {
   directionId: string;
   items: ToleranceItem[];
   unit: ToleranceUnit;
-  targetBudget?: number;
+  usl?: number; // Upper Specification Limit
+  lsl?: number; // Lower Specification Limit
   calculationMode: CalculationMode;
   analysisSettings?: AnalysisSettings;
+  isCalculating?: boolean;
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
@@ -44,16 +58,39 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   directionId,
   items,
   unit,
-  targetBudget,
+  usl,
+  lsl,
   calculationMode,
   analysisSettings,
+  isCalculating = false,
 }) => {
   const [showContributions, setShowContributions] = useState(false);
   const [showStatistical, setShowStatistical] = useState(false);
   const [sensitivityOpen, setSensitivityOpen] = useState(false);
+  const [showItemHistograms, setShowItemHistograms] = useState(false);
 
   const showMultiUnit = analysisSettings?.showMultiUnit || false;
   const secondaryUnit = analysisSettings?.secondaryUnit || 'inches';
+
+  // Show loading indicator for Monte Carlo
+  if (isCalculating) {
+    return (
+      <Paper elevation={0} variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          <strong>{directionName}</strong>
+        </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 3 }}>
+          <CircularProgress />
+          <Typography variant="body2" color="text.secondary">
+            Running Monte Carlo simulation...
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            ({analysisSettings?.monteCarloSettings?.iterations?.toLocaleString() || '50,000'} iterations)
+          </Typography>
+        </Box>
+      </Paper>
+    );
+  }
 
   if (!result) {
     return (
@@ -79,17 +116,34 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
     return `${value.toFixed(4)} ${unit}`;
   };
 
-  // Budget comparison logic
-  const hasBudget = targetBudget !== undefined && targetBudget > 0;
-  let budgetStatus: 'pass' | 'warning' | 'fail' = 'pass';
-  let budgetUtilization = 0;
+  // Specification limit comparison logic
+  const hasUSL = usl !== undefined && usl > 0;
+  const hasLSL = lsl !== undefined && lsl < 0;
+  const hasLimits = hasUSL || hasLSL;
 
-  if (hasBudget) {
-    budgetUtilization = (totalPlus / targetBudget!) * 100;
-    if (budgetUtilization > 100) {
-      budgetStatus = 'fail';
-    } else if (budgetUtilization > 90) {
-      budgetStatus = 'warning';
+  let specStatus: 'pass' | 'warning' | 'fail' = 'pass';
+  let uslUtilization = 0;
+  let lslUtilization = 0;
+  let exceedsUSL = false;
+  let exceedsLSL = false;
+
+  if (hasUSL) {
+    uslUtilization = (totalPlus / usl!) * 100;
+    exceedsUSL = totalPlus > usl!;
+    if (uslUtilization > 100) {
+      specStatus = 'fail';
+    } else if (uslUtilization > 90) {
+      specStatus = 'warning';
+    }
+  }
+
+  if (hasLSL) {
+    lslUtilization = (totalMinus / Math.abs(lsl!)) * 100;
+    exceedsLSL = totalMinus > Math.abs(lsl!);
+    if (lslUtilization > 100) {
+      specStatus = 'fail';
+    } else if (lslUtilization > 90 && specStatus === 'pass') {
+      specStatus = 'warning';
     }
   }
 
@@ -127,7 +181,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
       <Box sx={{ mb: 2 }}>
         <Box sx={{ mb: 1 }}>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-            {calculationMode === 'rss' ? 'RSS (Statistical)' : 'Worst-Case (Arithmetic)'}
+            {calculationMode === 'monteCarlo'
+              ? 'Monte Carlo (±3σ, 99.7% confidence)'
+              : calculationMode === 'rss'
+              ? 'RSS (Statistical)'
+              : 'Worst-Case (Arithmetic)'}
           </Typography>
           <Chip
             label={
@@ -152,23 +210,47 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           </Box>
         )}
 
-        {hasBudget && (
+        {hasLimits && (
           <Box sx={{ mt: 1 }}>
-            <Typography variant="caption" color="text.secondary">
-              Target: ±{targetBudget.toFixed(4)} {unit}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+              Specification Limits:
             </Typography>
-            <Box sx={{ mt: 0.5 }}>
-              <Chip
-                size="small"
-                label={`${budgetUtilization.toFixed(1)}% of budget`}
-                color={budgetStatus === 'fail' ? 'error' : budgetStatus === 'warning' ? 'warning' : 'success'}
-                icon={budgetStatus === 'fail' || budgetStatus === 'warning' ? <WarningIcon /> : undefined}
-              />
-            </Box>
-            {budgetStatus === 'fail' && (
-              <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
-                Exceeds target budget by {(totalPlus - targetBudget).toFixed(4)} {unit}
-              </Typography>
+            {hasUSL && (
+              <Box sx={{ mb: 0.5 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  USL: +{usl!.toFixed(4)} {unit}
+                </Typography>
+                <Chip
+                  size="small"
+                  label={`${uslUtilization.toFixed(1)}% of USL`}
+                  color={exceedsUSL ? 'error' : uslUtilization > 90 ? 'warning' : 'success'}
+                  icon={exceedsUSL || uslUtilization > 90 ? <WarningIcon /> : undefined}
+                  sx={{ mr: 0.5 }}
+                />
+                {exceedsUSL && (
+                  <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                    Exceeds USL by {(totalPlus - usl!).toFixed(4)} {unit}
+                  </Typography>
+                )}
+              </Box>
+            )}
+            {hasLSL && (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  LSL: {lsl!.toFixed(4)} {unit}
+                </Typography>
+                <Chip
+                  size="small"
+                  label={`${lslUtilization.toFixed(1)}% of LSL`}
+                  color={exceedsLSL ? 'error' : lslUtilization > 90 ? 'warning' : 'success'}
+                  icon={exceedsLSL || lslUtilization > 90 ? <WarningIcon /> : undefined}
+                />
+                {exceedsLSL && (
+                  <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                    Exceeds LSL by {(totalMinus - Math.abs(lsl!)).toFixed(4)} {unit}
+                  </Typography>
+                )}
+              </Box>
             )}
           </Box>
         )}
@@ -188,6 +270,330 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           </Box>
         )}
       </Box>
+
+      {/* Monte Carlo Results */}
+      {result.monteCarloResult && calculationMode === 'monteCarlo' && (
+        <Box sx={{ mt: 2 }}>
+          {/* Percentile Summary Table */}
+          <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+            Distribution Statistics
+          </Typography>
+          <Paper elevation={0} variant="outlined" sx={{ p: 1, mb: 2 }}>
+            <Grid container spacing={1}>
+              <Grid item xs={6} sm={3}>
+                <Typography variant="caption" color="text.secondary">5th Percentile</Typography>
+                <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
+                  {formatValue(result.monteCarloResult.percentiles.p5)}
+                </Typography>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Typography variant="caption" color="text.secondary">Median (50th)</Typography>
+                <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
+                  {formatValue(result.monteCarloResult.percentiles.p50)}
+                </Typography>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Typography variant="caption" color="text.secondary">95th Percentile</Typography>
+                <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT, fontWeight: 'bold' }}>
+                  {formatValue(result.monteCarloResult.percentiles.p95)}
+                </Typography>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Typography variant="caption" color="text.secondary">99th Percentile</Typography>
+                <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
+                  {formatValue(result.monteCarloResult.percentiles.p99)}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary">Mean</Typography>
+                <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
+                  {formatValue(result.monteCarloResult.percentiles.mean)}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" color="text.secondary">Std Deviation</Typography>
+                <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
+                  {formatValue(result.monteCarloResult.percentiles.stdDev)}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* Risk Analysis (if limits exist) */}
+          {result.monteCarloResult.riskAnalysis && (
+            <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'warning.light' }}>
+              <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+                Risk Analysis
+              </Typography>
+              {result.monteCarloResult.riskAnalysis.usl !== undefined && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Chip
+                    size="small"
+                    label={`${(result.monteCarloResult.riskAnalysis.probabilityExceedingUSL * 100).toFixed(2)}%`}
+                    color={result.monteCarloResult.riskAnalysis.probabilityExceedingUSL > 0.05 ? 'error' : 'success'}
+                    sx={{ fontFamily: MONOSPACE_FONT }}
+                  />
+                  <Typography variant="caption">
+                    probability of exceeding USL
+                  </Typography>
+                </Box>
+              )}
+              {result.monteCarloResult.riskAnalysis.lsl !== undefined && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Chip
+                    size="small"
+                    label={`${(result.monteCarloResult.riskAnalysis.probabilityExceedingLSL * 100).toFixed(2)}%`}
+                    color={result.monteCarloResult.riskAnalysis.probabilityExceedingLSL > 0.05 ? 'error' : 'success'}
+                    sx={{ fontFamily: MONOSPACE_FONT }}
+                  />
+                  <Typography variant="caption">
+                    probability of exceeding LSL
+                  </Typography>
+                </Box>
+              )}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Chip
+                  size="small"
+                  label={`${(result.monteCarloResult.riskAnalysis.probabilityOutOfSpec * 100).toFixed(2)}%`}
+                  color={result.monteCarloResult.riskAnalysis.probabilityOutOfSpec > 0.05 ? 'error' : 'success'}
+                  sx={{ fontFamily: MONOSPACE_FONT }}
+                />
+                <Typography variant="caption">
+                  total probability out of spec
+                </Typography>
+              </Box>
+              <Typography variant="caption" color="text.secondary">
+                Expected defect rate: {result.monteCarloResult.riskAnalysis.expectedDefectRate.toFixed(0)} PPM
+              </Typography>
+            </Paper>
+          )}
+
+          {/* Final Stack Histogram */}
+          <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+            Final Tolerance Stack Distribution
+          </Typography>
+          <Paper elevation={0} variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={(() => {
+                // Generate histogram bins
+                const histogramData = result.monteCarloResult.histogram.map(bin => ({
+                  x: bin.binCenter,
+                  frequency: bin.frequency,
+                  count: bin.count,
+                  pdf: undefined as number | undefined,
+                }));
+
+                // Generate smooth PDF curve (300 samples across range)
+                const mean = result.monteCarloResult.percentiles.mean;
+                const std = result.monteCarloResult.percentiles.stdDev;
+                const minX = Math.min(...result.monteCarloResult.histogram.map(b => b.binStart));
+                const maxX = Math.max(...result.monteCarloResult.histogram.map(b => b.binEnd));
+                const range = maxX - minX;
+                const samples = 300;
+
+                // Calculate max PDF for normalization
+                const maxHistFreq = Math.max(...result.monteCarloResult.histogram.map(b => b.frequency));
+                const maxPdfValue = normalPdf(mean, mean, std);
+                const scaleFactor = maxHistFreq / maxPdfValue;
+
+                const curveData = Array.from({ length: samples }, (_, i) => {
+                  const x = minX + (i / (samples - 1)) * range;
+                  const pdfValue = normalPdf(x, mean, std) * scaleFactor;
+                  return {
+                    x: x,
+                    frequency: undefined as number | undefined,
+                    count: undefined,
+                    pdf: pdfValue,
+                  };
+                });
+
+                // Combine datasets (histogram + curve)
+                return [...histogramData, ...curveData].sort((a, b) => a.x - b.x);
+              })()}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis
+                  dataKey="x"
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                  tickFormatter={(value) => value.toFixed(3)}
+                  label={{ value: `Tolerance (${unit})`, position: 'insideBottom', offset: -5 }}
+                  tick={{ fontSize: 10 }}
+                />
+                <YAxis
+                  label={{ value: 'Frequency', angle: -90, position: 'insideLeft' }}
+                />
+                <RechartsTooltip
+                  formatter={(value: number, name: string) => {
+                    if (name === 'frequency') return [(value * 100).toFixed(2) + '%', 'Frequency'];
+                    if (name === 'pdf') return [(value * 100).toFixed(2) + '%', 'PDF'];
+                    return [value, name];
+                  }}
+                  labelFormatter={(value) => `x = ${Number(value).toFixed(4)}`}
+                />
+                <Bar dataKey="frequency" fill="rgba(150, 150, 150, 0.5)" />
+                <Line
+                  type="monotone"
+                  dataKey="pdf"
+                  stroke="#1976d2"
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+                {hasUSL && (
+                  <ReferenceLine
+                    x={usl}
+                    stroke="#d62728"
+                    strokeDasharray="4 4"
+                    strokeWidth={1.5}
+                    label={{ value: 'USL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
+                  />
+                )}
+                {hasLSL && (
+                  <ReferenceLine
+                    x={lsl}
+                    stroke="#d62728"
+                    strokeDasharray="4 4"
+                    strokeWidth={1.5}
+                    label={{ value: 'LSL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
+                  />
+                )}
+                <ReferenceLine
+                  x={result.monteCarloResult.percentiles.mean}
+                  stroke="#2ca02c"
+                  strokeDasharray="2 2"
+                  strokeWidth={1.5}
+                  label={{ value: 'μ', position: 'top', fill: '#2ca02c', fontSize: 11 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+              {result.monteCarloResult.iterations.toLocaleString()} simulation iterations
+            </Typography>
+          </Paper>
+
+          {/* Individual Item Histograms (Collapsible) */}
+          {items.length > 1 && (
+            <>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: 'action.hover' },
+                  borderRadius: 1,
+                  px: 1,
+                  py: 0.5,
+                  mt: 2,
+                }}
+                onClick={() => setShowItemHistograms(!showItemHistograms)}
+              >
+                <Typography variant="caption" sx={{ flexGrow: 1 }}>
+                  <strong>Individual Item Distributions</strong>
+                </Typography>
+                <IconButton
+                  size="small"
+                  sx={{
+                    transform: showItemHistograms ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s',
+                  }}
+                >
+                  <ExpandMoreIcon fontSize="small" />
+                </IconButton>
+              </Box>
+
+              <Collapse in={showItemHistograms}>
+                <Box sx={{ mt: 1 }}>
+                  {items.map(item => {
+                    const itemHistogram = result.monteCarloResult!.itemHistograms.get(item.id);
+                    if (!itemHistogram) return null;
+
+                    // Find item's contribution data (has mean and stdDev)
+                    const itemContrib = result.monteCarloResult!.itemContributions.find(ic => ic.itemId === item.id);
+                    if (!itemContrib) return null;
+
+                    // Calculate item statistics from histogram for PDF curve
+                    const itemMean = itemHistogram.reduce((sum, bin) => sum + bin.binCenter * bin.frequency, 0);
+                    const itemVariance = itemHistogram.reduce((sum, bin) =>
+                      sum + Math.pow(bin.binCenter - itemMean, 2) * bin.frequency, 0
+                    );
+                    const itemStd = Math.sqrt(itemVariance);
+
+                    return (
+                      <Paper key={item.id} elevation={0} variant="outlined" sx={{ p: 2, mb: 1 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 'bold', mb: 1, display: 'block' }}>
+                          {item.name}
+                        </Typography>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <ComposedChart data={(() => {
+                            // Histogram data
+                            const histData = itemHistogram.map(bin => ({
+                              x: bin.binCenter,
+                              frequency: bin.frequency,
+                              pdf: undefined as number | undefined,
+                            }));
+
+                            // Generate PDF curve (200 samples)
+                            const minX = Math.min(...itemHistogram.map(b => b.binStart));
+                            const maxX = Math.max(...itemHistogram.map(b => b.binEnd));
+                            const range = maxX - minX;
+                            const samples = 200;
+
+                            // Normalize PDF to histogram scale
+                            const maxHistFreq = Math.max(...itemHistogram.map(b => b.frequency));
+                            const maxPdfValue = normalPdf(itemMean, itemMean, itemStd);
+                            const scaleFactor = maxHistFreq / maxPdfValue;
+
+                            const curveData = Array.from({ length: samples }, (_, i) => {
+                              const x = minX + (i / (samples - 1)) * range;
+                              const pdfValue = normalPdf(x, itemMean, itemStd) * scaleFactor;
+                              return {
+                                x: x,
+                                frequency: undefined as number | undefined,
+                                pdf: pdfValue,
+                              };
+                            });
+
+                            return [...histData, ...curveData].sort((a, b) => a.x - b.x);
+                          })()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                            <XAxis
+                              dataKey="x"
+                              type="number"
+                              domain={['dataMin', 'dataMax']}
+                              tickFormatter={(value) => value.toFixed(3)}
+                              tick={{ fontSize: 10 }}
+                            />
+                            <YAxis />
+                            <RechartsTooltip
+                              formatter={(value: number, name: string) => {
+                                if (name === 'frequency') return [(value * 100).toFixed(2) + '%', 'Frequency'];
+                                if (name === 'pdf') return [(value * 100).toFixed(2) + '%', 'PDF'];
+                                return [value, name];
+                              }}
+                              labelFormatter={(value) => `x = ${Number(value).toFixed(4)}`}
+                            />
+                            <Bar dataKey="frequency" fill="rgba(150, 150, 150, 0.5)" />
+                            <Line
+                              type="monotone"
+                              dataKey="pdf"
+                              stroke="#1976d2"
+                              strokeWidth={2}
+                              dot={false}
+                              connectNulls={false}
+                              isAnimationActive={false}
+                            />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </Paper>
+                    );
+                  })}
+                </Box>
+              </Collapse>
+            </>
+          )}
+        </Box>
+      )}
 
       {/* Statistical Analysis Section */}
       {result.statistical && calculationMode === 'rss' && (

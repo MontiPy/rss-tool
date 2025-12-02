@@ -4,9 +4,14 @@
 export type ToleranceMode = 'symmetric' | 'asymmetric';
 
 /**
- * Calculation mode: RSS (statistical) or Worst-Case (arithmetic)
+ * Calculation mode: RSS (statistical), Worst-Case (arithmetic), or Monte Carlo (probabilistic)
  */
-export type CalculationMode = 'rss' | 'worstCase';
+export type CalculationMode = 'rss' | 'worstCase' | 'monteCarlo';
+
+/**
+ * Distribution type for Monte Carlo simulation
+ */
+export type DistributionType = 'normal' | 'uniform' | 'triangular';
 
 /**
  * Statistical confidence level (sigma)
@@ -32,6 +37,7 @@ export interface ToleranceItem {
   isFloat?: boolean; // DEPRECATED: Backward compatibility, use floatFactor instead
   notes?: string; // Optional notes or description for this item
   source?: string; // Optional source reference (drawing number, spec, part number)
+  distributionType?: DistributionType; // Distribution for Monte Carlo (used in advanced mode)
 }
 
 /**
@@ -42,7 +48,9 @@ export interface Direction {
   name: string;
   description?: string; // Optional description of what this direction represents
   items: ToleranceItem[];
-  targetBudget?: number; // Optional target tolerance budget for comparison
+  usl?: number; // Upper Specification Limit (positive tolerance limit)
+  lsl?: number; // Lower Specification Limit (negative tolerance limit)
+  targetBudget?: number; // DEPRECATED: Backward compatibility only, use usl/lsl instead
 }
 
 /**
@@ -59,14 +67,75 @@ export interface ProjectMetadata {
 }
 
 /**
+ * Monte Carlo simulation settings
+ */
+export interface MonteCarloSettings {
+  iterations: number; // Number of simulation runs (default: 50000)
+  useAdvancedDistributions: boolean; // Allow per-item distribution selection
+  seed?: number; // Optional random seed for reproducibility
+}
+
+/**
+ * Histogram bin for visualization
+ */
+export interface HistogramBin {
+  binStart: number;
+  binEnd: number;
+  binCenter: number;
+  count: number;
+  frequency: number; // Normalized (0-1)
+}
+
+/**
+ * Percentile statistics
+ */
+export interface PercentileData {
+  p5: number;
+  p50: number; // median
+  p95: number;
+  p99: number;
+  mean: number;
+  stdDev: number;
+}
+
+/**
+ * Monte Carlo simulation result
+ */
+export interface MonteCarloResult {
+  directionId: string;
+  directionName: string;
+  iterations: number;
+  samples: number[]; // Array of RSS results from each iteration
+  percentiles: PercentileData;
+  histogram: HistogramBin[]; // Final stack distribution (50 bins)
+  itemHistograms: Map<string, HistogramBin[]>; // Individual item distributions (30 bins each)
+  itemContributions: {
+    itemId: string;
+    itemName: string;
+    mean: number;
+    stdDev: number;
+    percentContribution: number;
+  }[];
+  riskAnalysis?: {
+    usl?: number; // Upper Specification Limit
+    lsl?: number; // Lower Specification Limit
+    probabilityExceedingUSL: number; // 0-1 probability of exceeding USL
+    probabilityExceedingLSL: number; // 0-1 probability of exceeding LSL
+    probabilityOutOfSpec: number; // 0-1 total probability of being out of spec (either side)
+    expectedDefectRate: number; // Parts per million (PPM)
+  };
+}
+
+/**
  * Analysis settings for calculations
  */
 export interface AnalysisSettings {
-  calculationMode: CalculationMode; // RSS or Worst-Case
+  calculationMode: CalculationMode; // RSS, Worst-Case, or Monte Carlo
   showMultiUnit: boolean; // Display results in multiple units
   secondaryUnit?: ToleranceUnit; // Secondary unit for multi-unit display
   contributionThreshold: number; // Alert threshold for high-impact items (default: 40%)
   sensitivityIncrement: number; // Increment for sensitivity analysis slider (default: 0.1)
+  monteCarloSettings?: MonteCarloSettings; // Monte Carlo simulation configuration
 }
 
 /**
@@ -104,6 +173,8 @@ export interface RSSResult {
     required3SigmaFor1_33Cpk: number; // 3σ needed for Cpk = 1.33
     required3SigmaFor1_66Cpk: number; // 3σ needed for Cpk = 1.66
   };
+  // Monte Carlo simulation result (present when calculationMode = 'monteCarlo')
+  monteCarloResult?: MonteCarloResult;
 }
 
 /**

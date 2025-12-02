@@ -17,6 +17,10 @@ import {
   FormControlLabel,
   Typography,
   Divider,
+  Radio,
+  RadioGroup,
+  FormLabel,
+  Switch,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { ProjectMetadata, ToleranceUnit, AnalysisSettings } from '../types';
@@ -268,6 +272,96 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
               inputProps={{ step: 1, min: 0, max: 100 }}
               helperText="Percentage threshold for high-impact item warnings (default: 40%)"
             />
+          </Grid>
+
+          {/* Monte Carlo Settings Section */}
+          <Grid item xs={12}>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle2" gutterBottom>
+              Monte Carlo Settings
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <FormControl fullWidth>
+              <FormLabel>Default Iterations</FormLabel>
+              <RadioGroup
+                value={
+                  editedSettings.monteCarloSettings?.iterations === 10000 ? '10k' :
+                  editedSettings.monteCarloSettings?.iterations === 100000 ? '100k' :
+                  editedSettings.monteCarloSettings?.iterations === 50000 ? '50k' :
+                  'custom'
+                }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const iterations = value === '10k' ? 10000 :
+                                    value === '100k' ? 100000 :
+                                    value === '50k' ? 50000 :
+                                    editedSettings.monteCarloSettings?.iterations || 50000;
+                  setEditedSettings({
+                    ...editedSettings,
+                    monteCarloSettings: {
+                      ...(editedSettings.monteCarloSettings || { useAdvancedDistributions: false }),
+                      iterations,
+                    },
+                  });
+                }}
+              >
+                <FormControlLabel value="10k" control={<Radio />} label="10,000 (Fast)" />
+                <FormControlLabel value="50k" control={<Radio />} label="50,000 (Balanced)" />
+                <FormControlLabel value="100k" control={<Radio />} label="100,000 (Accurate)" />
+                <FormControlLabel value="custom" control={<Radio />} label="Custom" />
+              </RadioGroup>
+            </FormControl>
+          </Grid>
+
+          {editedSettings.monteCarloSettings?.iterations !== 10000 &&
+           editedSettings.monteCarloSettings?.iterations !== 50000 &&
+           editedSettings.monteCarloSettings?.iterations !== 100000 && (
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Custom Iteration Count"
+                type="number"
+                fullWidth
+                value={editedSettings.monteCarloSettings?.iterations || 50000}
+                onChange={(e) => {
+                  const iterations = Math.max(1000, Math.min(1000000, parseInt(e.target.value) || 50000));
+                  setEditedSettings({
+                    ...editedSettings,
+                    monteCarloSettings: {
+                      ...(editedSettings.monteCarloSettings || { useAdvancedDistributions: false }),
+                      iterations,
+                    },
+                  });
+                }}
+                inputProps={{ min: 1000, max: 1000000, step: 1000 }}
+                helperText="Range: 1,000 - 1,000,000"
+              />
+            </Grid>
+          )}
+
+          <Grid item xs={12}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editedSettings.monteCarloSettings?.useAdvancedDistributions || false}
+                  onChange={(e) => {
+                    setEditedSettings({
+                      ...editedSettings,
+                      monteCarloSettings: {
+                        ...(editedSettings.monteCarloSettings || { iterations: 50000 }),
+                        useAdvancedDistributions: e.target.checked,
+                      },
+                    });
+                  }}
+                />
+              }
+              label="Advanced: Per-item distribution selection"
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
+              When enabled, you can select Normal/Uniform/Triangular for each tolerance item.
+              Default uses Normal for fixed items and Uniform for floating items.
+            </Typography>
           </Grid>
         </Grid>
       </DialogContent>
