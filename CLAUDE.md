@@ -134,18 +134,30 @@ WC = Σ(contribution)  // Simple sum of all contributions
 
 ### Calculation Trigger
 
-RSS recalculates automatically via `useEffect` in `DirectionTab.tsx`:
+Calculations run automatically via `useEffect` in `DirectionTab.tsx`:
 
 ```typescript
 useEffect(() => {
   if (direction.items.length > 0) {
-    const result = calculateRSS(direction.items, direction.id, direction.name);
+    // Calculate based on mode
+    const result = calculateTolerance(direction.items, direction.id, direction.name, calculationMode);
+
+    // Add statistical analysis if USL exists (RSS mode only)
+    if (calculationMode === 'rss' && direction.usl) {
+      result.statistical = calculateStatisticalAnalysis(...);
+    }
+
     setRssResult(result);
   }
-}, [direction]);  // Watches entire direction object
+}, [direction, calculationMode]);
 ```
 
-**Lazy Calculation:** Only the active tab's direction calculates RSS. Inactive tabs don't recalculate until user switches to them (performance optimization).
+**Key Points:**
+- **RSS mode:** Runs RSS calculation (deterministic) + generates theoretical distribution on demand in ResultsDisplay
+- **Monte Carlo mode:** Runs Monte Carlo simulation (probabilistic)
+- **Worst-Case mode:** Runs worst-case arithmetic sum
+- **Lazy Calculation:** Only the active tab's direction calculates. Inactive tabs don't recalculate until user switches to them (performance optimization).
+- **Distribution visualization in RSS mode** is generated in the UI component using `generateRSSDistribution()` - not computed during calculation
 
 ## File I/O
 
@@ -252,11 +264,43 @@ Status Colors (checked independently for USL and LSL):
 
 **Results Display:**
 - Shows current mode in results header
-- RSS mode: also displays worst-case comparison with savings calculation
+- **RSS mode:**
+  - Displays RSS total (primary result - deterministic)
+  - Shows worst-case comparison with savings calculation
+  - **NEW:** Includes collapsible "Distribution Visualization" section
+  - Shows theoretical normal distribution curve assuming RSS = ±3σ
+  - Displays shaded acceptance region (green) between USL and LSL
+  - Calculates theoretical probabilities of exceeding specification limits using normal CDF
+  - Provides risk analysis with expected defect rate (PPM)
 - Worst-case mode: shows only arithmetic sum result
-- Monte Carlo mode: displays 95th percentile with full distribution analysis
+- Monte Carlo mode: displays ±3σ with full probabilistic distribution analysis (always expanded)
+
+### RSS Distribution Visualization (NEW)
+
+**Purpose:** Theoretical visualization of RSS results as a normal distribution
+
+**Key Features:**
+- **Assumes RSS = ±3σ** (99.7% confidence interval)
+- Generates smooth normal curve with mean μ = 0, standard deviation σ = RSS/3
+- **Shaded regions:**
+  - Green acceptance region between LSL and USL
+  - Shows visually how much of the distribution falls within spec
+- **Theoretical risk analysis:**
+  - Probability of exceeding USL (using normal CDF)
+  - Probability of exceeding LSL (using normal CDF)
+  - Total probability out of spec
+  - Expected defect rate in PPM
+- **Collapsible section** - keeps UI clean, expand when needed
+
+**Implementation:**
+- Function: `generateRSSDistribution()` in `rssCalculator.ts`
+- Uses `normalCDF()` for probability calculations
+- Uses `normalPdf()` for curve generation
+- Renders using Recharts `ComposedChart` with Area (shaded regions) + Line (curve)
 
 ### Monte Carlo Simulation
+
+**Usage:** Primary calculation method using probabilistic simulation (Monte Carlo mode only)
 
 **Configuration (ProjectMetadataEditor):**
 - Iteration count: 10k / 50k (default) / 100k / Custom (1k-1M)

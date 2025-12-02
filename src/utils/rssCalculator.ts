@@ -191,7 +191,7 @@ export function calculateStatisticalAnalysis(
  * @param z - The z-score
  * @returns Probability (0 to 1)
  */
-function normalCDF(z: number): number {
+export function normalCDF(z: number): number {
   // Approximation using error function
   // CDF(z) ≈ 0.5 * (1 + erf(z / sqrt(2)))
 
@@ -219,4 +219,81 @@ function normalCDF(z: number): number {
 export function normalPdf(x: number, mean: number, std: number): number {
   const z = (x - mean) / std;
   return Math.exp(-0.5 * z * z) / (std * Math.sqrt(2 * Math.PI));
+}
+
+/**
+ * Generate theoretical RSS distribution curve data
+ * Assumes RSS total represents ±3σ of a normal distribution
+ *
+ * @param rssTotal - The RSS total tolerance (represents ±3σ)
+ * @param usl - Upper Specification Limit (optional)
+ * @param lsl - Lower Specification Limit (optional)
+ * @param numPoints - Number of points to generate for the curve (default: 500)
+ * @param customMinX - Custom minimum x value for range (optional)
+ * @param customMaxX - Custom maximum x value for range (optional)
+ * @returns Object with curve data and risk analysis
+ */
+export function generateRSSDistribution(
+  rssTotal: number,
+  usl?: number,
+  lsl?: number,
+  numPoints: number = 500,
+  customMinX?: number,
+  customMaxX?: number
+) {
+  // Assume RSS total is 3σ (99.7% confidence interval)
+  const mean = 0;
+  const stdDev = rssTotal / 3;
+
+  // Calculate the range to display
+  let minX: number;
+  let maxX: number;
+
+  if (customMinX !== undefined && customMaxX !== undefined) {
+    // Use custom range if provided
+    minX = customMinX;
+    maxX = customMaxX;
+  } else {
+    // Default: ±4σ for better visualization
+    const range = 4 * stdDev;
+    minX = mean - range;
+    maxX = mean + range;
+  }
+
+  const step = (maxX - minX) / numPoints;
+
+  // Generate curve data points
+  const curveData = [];
+  for (let i = 0; i <= numPoints; i++) {
+    const x = minX + i * step;
+    const pdf = normalPdf(x, mean, stdDev);
+    curveData.push({ x, pdf });
+  }
+
+  // Calculate probabilities of exceeding specification limits
+  let riskAnalysis;
+  if (usl !== undefined || lsl !== undefined) {
+    const probExceedingUSL = usl !== undefined ? 1 - normalCDF((usl - mean) / stdDev) : 0;
+    const probExceedingLSL = lsl !== undefined ? normalCDF((lsl - mean) / stdDev) : 0;
+    const probOutOfSpec = probExceedingUSL + probExceedingLSL;
+    const expectedDefectRate = probOutOfSpec * 1_000_000; // PPM
+
+    riskAnalysis = {
+      usl,
+      lsl,
+      probabilityExceedingUSL: probExceedingUSL,
+      probabilityExceedingLSL: probExceedingLSL,
+      probabilityOutOfSpec: probOutOfSpec,
+      expectedDefectRate: expectedDefectRate,
+    };
+  }
+
+  return {
+    mean,
+    stdDev,
+    curveData,
+    riskAnalysis,
+    minX,
+    maxX,
+  };
 }
