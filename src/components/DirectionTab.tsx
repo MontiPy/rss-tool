@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Grid, TextField, Button } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { Direction, ToleranceMode, ToleranceUnit, RSSResult, CalculationMode, AnalysisSettings, ToleranceItem } from '../types';
 import ToleranceTable from './ToleranceTable';
 import ResultsDisplay from './ResultsDisplay';
 import CSVImportDialog from './CSVImportDialog';
+import DiagramBuilderDialog from './DiagramBuilderDialog';
 import { calculateTolerance, calculateStatisticalAnalysis } from '../utils/rssCalculator';
 import { runMonteCarloSimulation } from '../utils/monteCarloCalculator';
 
@@ -27,6 +29,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
 }) => {
   const [rssResult, setRssResult] = useState<RSSResult | null>(null);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [diagramOpen, setDiagramOpen] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
 
   // Recalculate whenever items or calculation mode changes
@@ -130,6 +133,10 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
     });
   };
 
+  const handleDiagramSave = (updatedDirection: Direction) => {
+    onDirectionChange(updatedDirection);
+  };
+
   return (
     <Box sx={{ py: 1 }}>
       <Box sx={{ mb: 2 }}>
@@ -175,7 +182,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
           </Grid>
         </Grid>
       </Box>
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
         <Button
           variant="outlined"
           startIcon={<CloudUploadIcon />}
@@ -183,6 +190,14 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
           size="small"
         >
           Import from CSV
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<AccountTreeIcon />}
+          onClick={() => setDiagramOpen(true)}
+          size="small"
+        >
+          Open Stack Diagram
         </Button>
       </Box>
       <Grid container spacing={2}>
@@ -214,6 +229,15 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
         onClose={() => setCsvImportOpen(false)}
         onImport={handleCSVImport}
         isSymmetricMode={toleranceMode === 'symmetric'}
+      />
+
+      <DiagramBuilderDialog
+        open={diagramOpen}
+        onClose={() => setDiagramOpen(false)}
+        direction={direction}
+        toleranceMode={toleranceMode}
+        unit={unit}
+        onSave={handleDiagramSave}
       />
     </Box>
   );

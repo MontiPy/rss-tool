@@ -513,13 +513,155 @@ Heavy reliance on MUI for professional UI components (Tables, Tabs, Chips, TextF
 |-----------|---------------|-------|--------------|
 | `App.tsx` | Root state holder, tab management, direction CRUD, global settings | `projectData`, `activeTab`, `settingsOpen`, `helpOpen` | App bar with project name, Settings & Help icons, calculation mode toggle |
 | `ProjectMetadataEditor.tsx` | Edit project metadata, units, and analysis settings | `editedMetadata`, `selectedUnit`, `editedSettings` | Dialog with auto-dates, multi-unit config, sensitivity increment |
-| `DirectionTab.tsx` | Grid container, description, USL/LSL inputs, RSS calculation | `rssResult`, `csvImportOpen` (local) | Side-by-side layout, CSV import button, USL and LSL fields |
+| `DirectionTab.tsx` | Grid container, description, USL/LSL inputs, RSS calculation | `rssResult`, `csvImportOpen`, `diagramOpen` (local) | Side-by-side layout, CSV import button, diagram button, USL and LSL fields |
 | `ToleranceTable.tsx` | Editable 5-column table, add/remove/duplicate items, notes dialog | `notesDialogOpen`, `editingItem`, `editNotes`, `editSource` | Notes icon (blue when data), duplicate icon, validation min:0 |
 | `ResultsDisplay.tsx` | RSS/worst-case display, spec limit status, contributions, sensitivity | `showContributions`, `sensitivityOpen` (local) | Multi-unit support, USL/LSL chips (green/yellow/red), sensitivity button |
 | `FileControls.tsx` | Save/load JSON, export/import CSV | `snackbar` (local) | Compact buttons with success/error feedback |
 | `CSVImportDialog.tsx` | 3-step CSV import with column mapping | `activeStep`, `csvData`, `columnMapping`, `previewItems` | Stepper UI, drag-drop upload, column mapping dropdowns, preview table |
 | `SensitivityAnalysisDialog.tsx` | Interactive tolerance adjustment analysis | `adjustedItems`, `selectedItemId`, `currentTotal` | Dual input (slider + direct), dynamic limits, real-time RSS update, sensitivity metric |
 | `HelpDialog.tsx` | Comprehensive help documentation | None (stateless) | Expandable accordions, formulas, examples, best practices |
+| `DiagramBuilderDialog.tsx` | Visual diagram editor for tolerance stacks | `nodes`, `edges`, `hasChanges` (local) | React Flow integration, manual positioning, connectors, save/load diagram |
+| `DiagramCanvas.tsx` | React Flow wrapper with configuration | None (stateless) | Background grid, zoom/pan controls, minimap, custom node types |
+| `ToleranceItemNode.tsx` | Custom node displaying tolerance item | `expanded` (local) | Color-coded by float factor, collapsible metadata, connection handles |
+
+## Diagram Builder
+
+**Purpose:** Visual editor for tolerance stacks using React Flow library.
+
+### Architecture
+- **Library:** React Flow v11.11.4 (MIT license, ~200KB bundle size)
+- **Storage:** Optional `diagram` field in Direction interface
+- **Synchronization:** Bidirectional sync with ToleranceTable via App.tsx state
+
+### Components
+| Component | Purpose | File |
+|-----------|---------|------|
+| `DiagramBuilderDialog` | Main modal container, orchestrates diagram state | src/components/DiagramBuilderDialog.tsx |
+| `DiagramCanvas` | React Flow wrapper with grid, controls, minimap | src/components/DiagramCanvas.tsx |
+| `ToleranceItemNode` | Custom node displaying tolerance data | src/components/ToleranceItemNode.tsx |
+
+### Data Model
+
+**Direction Interface Updated:**
+```typescript
+export interface Direction {
+  id: string;
+  name: string;
+  description?: string;
+  items: ToleranceItem[];
+  usl?: number;
+  lsl?: number;
+  diagram?: DiagramData;  // NEW: Optional diagram visualization
+}
+```
+
+**DiagramData Structure:**
+```typescript
+export interface DiagramData {
+  nodes: DiagramNode[];           // Node positions (id matches ToleranceItem.id)
+  connectors: DiagramConnector[]; // Connections between nodes
+  viewport?: {                    // Saved zoom/pan state
+    x: number;
+    y: number;
+    zoom: number;
+  };
+}
+
+export interface DiagramNode {
+  id: string;              // Matches ToleranceItem.id (1:1 relationship)
+  position: { x: number; y: number };
+  width?: number;
+  height?: number;
+}
+
+export interface DiagramConnector {
+  id: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  label?: string;          // User-defined label (generic meaning)
+  animated?: boolean;
+  style?: { strokeColor?: string; strokeWidth?: number };
+}
+```
+
+### Features
+
+**Node Representation:**
+- Each box = one ToleranceItem
+- Color coding: Blue (fixed, floatFactor=1.0), Orange (floating, floatFactor>1.0)
+- Displays: item name, tolerance (±), float factor
+- Collapsible metadata: source reference, notes
+- Connection handles on all 4 sides (top, right, bottom, left)
+
+**Connectors:**
+- Generic relationships (user-defined meaning via labels)
+- Drag from handle to handle to create
+- Delete with Delete key or backspace
+- Animated flow effect optional
+
+**Layout:**
+- Manual positioning via drag-and-drop
+- Auto-position for new diagrams: vertical stack with 150px spacing
+- Positions preserved when switching modes or editing items
+- Zoom, pan, fit-view controls
+
+**Synchronization:**
+- **Single Source of Truth:** App.tsx `ProjectData.directions[].items`
+- **Table → Diagram:** Item changes update node data (positions preserved)
+- **Diagram → Table:** Not yet implemented (Phase 2: inline editing)
+- **Add/Delete:** New items auto-positioned at bottom, deleted items remove nodes and connected edges
+
+**Save/Load:**
+- Diagram data saved with Direction in JSON export
+- Backward compatible: old files without diagram field still work
+- Unsaved changes warning on close
+
+### Usage
+
+1. Click "Open Stack Diagram" button in DirectionTab (next to CSV Import)
+2. Dialog opens with existing diagram or auto-positioned nodes
+3. Drag nodes to desired positions
+4. Create connectors by dragging from node handles
+5. Click "Save" to persist diagram with Direction
+6. Diagram data exports/imports with project JSON
+
+### Implementation Notes
+
+**Node Initialization (`initializeDiagram()`):**
+- If `direction.diagram` exists: load saved positions
+- If no diagram: auto-position nodes vertically (y = 100 + index * 150)
+- Missing nodes (new items): append at bottom
+
+**State Management:**
+- Uses React Flow hooks: `useNodesState`, `useEdgesState`
+- Dirty flag tracks unsaved changes
+- Dialog reinitializes only when opened or direction ID changes
+
+**Performance:**
+- React Flow handles 1000+ nodes efficiently
+- Custom nodes use `React.memo` to prevent unnecessary re-renders
+- Lazy loading (future enhancement): use `React.lazy()` for dialog
+
+**Bundle Size:**
+- React Flow adds ~200KB to bundle (warning expected in build)
+- Future optimization: dynamic import for dialog component
+
+### Future Enhancements (Not Yet Implemented)
+
+**Phase 2: Connectors & Editing**
+- Connector labels (click edge to edit)
+- Inline node editing (double-click to edit tolerance values)
+- Connector animated flow toggle
+
+**Phase 3: Advanced Sync**
+- Full bidirectional editing (diagram edits → table updates)
+- Real-time sync when both open
+
+**Phase 4: Utilities**
+- DiagramToolbar component (fit view, clear connectors, examples)
+- ExampleDiagramViewer with template gallery
+- Auto-layout algorithms (hierarchical, force-directed)
+- Export diagram as image (PNG/SVG)
 
 ### Hot Module Replacement (HMR)
 Vite provides automatic HMR. Changes to `.tsx` files reload instantly without full page refresh. State is preserved during HMR when possible.

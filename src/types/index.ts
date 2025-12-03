@@ -41,6 +41,52 @@ export interface ToleranceItem {
 }
 
 /**
+ * Position for diagram nodes
+ */
+export interface DiagramPosition {
+  x: number;
+  y: number;
+}
+
+/**
+ * Node in diagram representing a tolerance item
+ */
+export interface DiagramNode {
+  id: string;              // Matches ToleranceItem.id (1:1 relationship)
+  position: DiagramPosition;
+  width?: number;          // Optional size overrides
+  height?: number;
+}
+
+/**
+ * Connector between two nodes in diagram
+ */
+export interface DiagramConnector {
+  id: string;                    // Unique connector ID
+  sourceNodeId: string;          // Source node ID
+  targetNodeId: string;          // Target node ID
+  label?: string;                // User-defined label (generic meaning)
+  animated?: boolean;            // Animated flow effect
+  style?: {
+    strokeColor?: string;
+    strokeWidth?: number;
+  };
+}
+
+/**
+ * Complete diagram data for a direction
+ */
+export interface DiagramData {
+  nodes: DiagramNode[];          // Node positions
+  connectors: DiagramConnector[];// Connections
+  viewport?: {                   // Saved zoom/pan state
+    x: number;
+    y: number;
+    zoom: number;
+  };
+}
+
+/**
  * A single direction/tolerance stack
  */
 export interface Direction {
@@ -51,6 +97,7 @@ export interface Direction {
   usl?: number; // Upper Specification Limit (positive tolerance limit)
   lsl?: number; // Lower Specification Limit (negative tolerance limit)
   targetBudget?: number; // DEPRECATED: Backward compatibility only, use usl/lsl instead
+  diagram?: DiagramData; // Optional diagram visualization data
 }
 
 /**
