@@ -18,12 +18,14 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import NotesIcon from '@mui/icons-material/Notes';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { ToleranceItem, ToleranceMode } from '../types';
+import { ToleranceItem, ToleranceMode, CalculationMode } from '../types';
 import { FLOAT_FACTORS } from '../utils/rssCalculator';
 import { MONOSPACE_FONT } from '../App';
 
@@ -31,12 +33,16 @@ interface ToleranceTableProps {
   items: ToleranceItem[];
   toleranceMode: ToleranceMode;
   onItemsChange: (items: ToleranceItem[]) => void;
+  calculationMode: CalculationMode;
+  useAdvancedDistributions?: boolean;
 }
 
 const ToleranceTable: React.FC<ToleranceTableProps> = ({
   items,
   toleranceMode,
   onItemsChange,
+  calculationMode,
+  useAdvancedDistributions = false,
 }) => {
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ToleranceItem | null>(null);
@@ -62,6 +68,7 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
     const newItem: ToleranceItem = {
       id: `item-${Date.now()}`,
       name: `Item ${items.length + 1}`,
+      nominal: 0,
       tolerancePlus: 0.5,
       toleranceMinus: 0.5,
       floatFactor: FLOAT_FACTORS.FIXED,
@@ -117,6 +124,7 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
           <TableHead>
             <TableRow>
               <TableCell><strong>Item</strong></TableCell>
+              <TableCell align="right"><strong>Nominal</strong></TableCell>
               <TableCell align="right">
                 <strong>
                   {toleranceMode === 'symmetric' ? 'Tolerance (±)' : 'Tolerance (+)'}
@@ -125,9 +133,14 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
               {toleranceMode === 'asymmetric' && (
                 <TableCell align="right"><strong>Tolerance (-)</strong></TableCell>
               )}
-              <TableCell align="center">
-                <strong>Float (√3)</strong>
-              </TableCell>
+              {calculationMode !== 'monteCarlo' && (
+                <TableCell align="center">
+                  <strong>Float (√3)</strong>
+                </TableCell>
+              )}
+              {calculationMode === 'monteCarlo' && useAdvancedDistributions && (
+                <TableCell align="center"><strong>Distribution</strong></TableCell>
+              )}
               <TableCell align="center"><strong>Actions</strong></TableCell>
             </TableRow>
           </TableHead>
@@ -140,6 +153,19 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                     onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
                     size="small"
                     fullWidth
+                  />
+                </TableCell>
+                <TableCell align="right">
+                  <TextField
+                    type="number"
+                    value={item.nominal ?? 0}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      handleItemChange(item.id, 'nominal', value);
+                    }}
+                    size="small"
+                    inputProps={{ step: 0.001 }}
+                    sx={{ width: 100, '& input': { fontFamily: MONOSPACE_FONT } }}
                   />
                 </TableCell>
                 <TableCell align="right">
@@ -174,22 +200,38 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                     />
                   </TableCell>
                 )}
-                <TableCell align="center">
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                    <Checkbox
-                      checked={item.floatFactor > 1.5}
-                      onChange={(e) => handleItemChange(
-                        item.id,
-                        'floatFactor',
-                        e.target.checked ? FLOAT_FACTORS.SQRT3 : FLOAT_FACTORS.FIXED
-                      )}
+                {calculationMode !== 'monteCarlo' && (
+                  <TableCell align="center">
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                      <Checkbox
+                        checked={item.floatFactor > 1.5}
+                        onChange={(e) => handleItemChange(
+                          item.id,
+                          'floatFactor',
+                          e.target.checked ? FLOAT_FACTORS.SQRT3 : FLOAT_FACTORS.FIXED
+                        )}
+                        size="small"
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        {item.floatFactor > 1.5 ? `(${FLOAT_FACTORS.SQRT3.toFixed(3)})` : '(1.0)'}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                )}
+                {calculationMode === 'monteCarlo' && useAdvancedDistributions && (
+                  <TableCell align="center">
+                    <Select
+                      value={item.distributionType || 'normal'}
+                      onChange={(e) => handleItemChange(item.id, 'distributionType', e.target.value)}
                       size="small"
-                    />
-                    <Typography variant="caption" color="text.secondary">
-                      {item.floatFactor > 1.5 ? `(${FLOAT_FACTORS.SQRT3.toFixed(3)})` : '(1.0)'}
-                    </Typography>
-                  </Box>
-                </TableCell>
+                      sx={{ width: 110 }}
+                    >
+                      <MenuItem value="normal">Normal</MenuItem>
+                      <MenuItem value="uniform">Uniform</MenuItem>
+                      <MenuItem value="triangular">Triangular</MenuItem>
+                    </Select>
+                  </TableCell>
+                )}
                 <TableCell align="center">
                   <Tooltip title="Add notes/source">
                     <IconButton

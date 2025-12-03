@@ -67,25 +67,29 @@ ProjectMetadata {
 }
 
 AnalysisSettings {
-  calculationMode: 'rss' | 'worstCase'  // Calculation method
+  calculationMode: 'rss' | 'worstCase' | 'monteCarlo'  // Calculation method
   showMultiUnit: boolean                 // Display results in multiple units
   secondaryUnit?: ToleranceUnit          // Unit for multi-unit display
   contributionThreshold: number          // Percentage threshold for high-impact warnings (default: 40)
   sensitivityIncrement: number           // Increment for sensitivity analysis slider (default: 0.1)
+  enableMonteCarlo: boolean              // Enable Monte Carlo mode (advanced feature, default: false)
+  monteCarloSettings?: MonteCarloSettings  // Monte Carlo configuration
 }
 
 Direction {
   id: string
   name: string               // "B-Direction", "H-Direction", etc.
   description?: string       // Optional description (e.g., "Envelope height from base to top")
-  usl?: number              // Upper Specification Limit (positive tolerance limit)
-  lsl?: number              // Lower Specification Limit (negative tolerance limit)
+  targetNominal?: number     // User-defined target dimension for the stack (any value allowed)
+  usl?: number              // Upper Specification Limit (any value allowed)
+  lsl?: number              // Lower Specification Limit (any value allowed)
   items: ToleranceItem[]     // Tolerance stack items
 }
 
 ToleranceItem {
   id: string
   name: string
+  nominal: number            // Nominal dimension value (default: 0, any value allowed)
   tolerancePlus: number      // Always stored separately, validated >= 0
   toleranceMinus: number     // Even in symmetric mode, validated >= 0
   floatFactor: number        // Float multiplier: 1.0 (fixed) or √3 ≈ 1.732 (floating)
@@ -95,8 +99,10 @@ ToleranceItem {
 ```
 
 **Important:**
+- `nominal` field represents the nominal dimension value for each item (can be any number: negative, zero, or positive). Defaults to 0 for new items. Backward compatible: old JSON files without nominal default to 0 during import.
+- `targetNominal` is a user-defined target dimension at the Direction level, representing the desired/design specification for the stack. Optional field.
 - `tolerancePlus` and `toleranceMinus` are ALWAYS stored separately, even in symmetric mode. This allows mode switching without data loss. The `ToleranceTable` component enforces `tolerancePlus === toleranceMinus` in symmetric mode via UI logic.
-- **Validation:** Tolerances are validated to be >= 0 across all input methods (manual entry, CSV import, JSON loading, sensitivity analysis)
+- **Validation:** Tolerances are validated to be >= 0 across all input methods (manual entry, CSV import, JSON loading, sensitivity analysis). Nominal values have no validation constraints.
 - `floatFactor` replaced the old boolean `isFloat` to support custom float values (backward compatibility maintained in JSON import)
 - All metadata fields are optional for backward compatibility with older JSON files
 - Unit selection affects display throughout the app (results, labels)
@@ -232,22 +238,23 @@ importFromJSON(file)  // Validates toleranceMode & directions exist
 
 **USL/LSL Setting:**
 - Each Direction can have optional specification limits:
-  - `usl` (Upper Specification Limit): positive tolerance limit
-  - `lsl` (Lower Specification Limit): negative tolerance limit
+  - `usl` (Upper Specification Limit): any value allowed (positive or negative)
+  - `lsl` (Lower Specification Limit): any value allowed (positive or negative)
 - Set via two TextFields in DirectionTab (top-right of description area)
-- Can be asymmetric (e.g., USL = +0.5, LSL = -0.3) or symmetric (e.g., USL = +2.5, LSL = -2.5)
-- LSL is always stored as a negative value internally
+- Can be asymmetric (e.g., USL = 5.0, LSL = -3.0) or symmetric (e.g., USL = 2.5, LSL = -2.5)
+- Both USL and LSL are stored as entered (no automatic sign conversion)
+- Typically USL > LSL (e.g., USL = +10, LSL = -10)
 - When set, ResultsDisplay shows color-coded status for each limit
 
 **Specification Status Logic:**
 ```typescript
-uslUtilization = (totalPlus / usl) × 100
+uslUtilization = (totalPlus / |usl|) × 100
 lslUtilization = (totalMinus / |lsl|) × 100
 
 Status Colors (checked independently for USL and LSL):
-- Green (Pass):    < 90% of limit
-- Yellow (Warning): 90-100% of limit
-- Red (Fail):      > 100% of limit
+- Green (Pass):    < 90% of limit magnitude
+- Yellow (Warning): 90-100% of limit magnitude
+- Red (Fail):      > 100% of limit magnitude
 ```
 
 **Visual Indicators:**
@@ -300,7 +307,13 @@ Status Colors (checked independently for USL and LSL):
 
 ### Monte Carlo Simulation
 
-**Usage:** Primary calculation method using probabilistic simulation (Monte Carlo mode only)
+**Usage:** Advanced calculation method using probabilistic simulation (Monte Carlo mode only)
+
+**Enabling Monte Carlo (Advanced Feature):**
+- Monte Carlo is disabled by default
+- Enable in Settings (⚙️) → Advanced Features → "Enable Monte Carlo Simulation"
+- Once enabled, "Monte Carlo" option appears in Calculation Mode radio buttons
+- Stored in `analysisSettings.enableMonteCarlo` (default: false)
 
 **Configuration (ProjectMetadataEditor):**
 - Iteration count: 10k / 50k (default) / 100k / Custom (1k-1M)
@@ -309,16 +322,21 @@ Status Colors (checked independently for USL and LSL):
 
 **Distribution Logic:**
 - **Auto mode** (default): Normal distribution for fixed items (floatFactor=1.0), Uniform for floating items (floatFactor≈√3)
+  - Float factor settings from RSS/Worst-Case modes are used to determine distribution type
+  - Fixed (floatFactor=1.0) → Normal distribution
+  - Floating (floatFactor≈√3) → Uniform distribution
 - **Advanced mode**: User selects Normal/Uniform/Triangular per item via dropdown in ToleranceTable
+  - When `useAdvancedDistributions` is enabled, Distribution column replaces Float column
+  - Each item can have a different distribution type
+  - Float checkbox is hidden in Monte Carlo mode (distribution selection replaces it)
 
 **Visualization:**
-- Final stack histogram (50 bins) - **bilateral distribution** centered at 0
-- **Smooth PDF curve overlay** - Normal distribution curve (300 samples) fitted to histogram data, scaled and normalized to match histogram height
+- Final stack histogram (50 bins) - **bilateral distribution** centered at 0, showing actual distribution shape
 - LSL (Lower Spec Limit) and USL (Upper Spec Limit) reference lines at specified limits (if set)
 - Mean (μ) reference line with green dashed marker
 - Percentile table (5th, 50th, 95th, 99th, mean, stdDev)
 - Risk analysis: probability of exceeding USL and/or LSL independently, plus total out-of-spec probability
-- Individual item histograms (30 bins each, bilateral, collapsible section) with PDF curve overlays (200 samples each)
+- Individual item histograms (30 bins each, bilateral, collapsible section) showing actual distribution shapes
 
 **Calculation:**
 - Runs N iterations (default: 50,000)
@@ -330,17 +348,14 @@ Status Colors (checked independently for USL and LSL):
 
 **Key Implementation Files:**
 - `src/utils/monteCarloCalculator.ts` - Core simulation engine
-- `src/components/ResultsDisplay.tsx` - Histogram visualizations using Recharts ComposedChart (Bar + Line)
-- `src/utils/rssCalculator.ts` - Contains `normalPdf()` function for curve generation
+- `src/components/ResultsDisplay.tsx` - Histogram visualizations using Recharts ComposedChart (Bar component)
 - `src/types/index.ts` - MonteCarloResult, HistogramBin, PercentileData types
 
-**PDF Curve Implementation:**
-- Uses `normalPdf(x, mean, std)` function: `exp(-0.5 * ((x - mean) / std)^2) / (std * sqrt(2π))`
-- Generates 300 sample points for final stack, 200 for individual items
-- Normalized to match histogram scale: `scaleFactor = maxHistFreq / maxPdfValue`
-- Rendered using Recharts `ComposedChart` with `Bar` (histogram) and `Line` (curve) components
-- Styling: Blue curve (#1976d2, strokeWidth 2), semi-transparent gray bars (rgba(150,150,150,0.5))
+**Histogram Display:**
+- Renders actual distribution shape using Recharts `ComposedChart` with `Bar` component
+- Styling: Semi-transparent gray bars (rgba(150,150,150,0.5))
 - Reference lines: Red LSL/USL (#d62728, dashed 4 4), Green mean (#2ca02c, dashed 2 2)
+- No curve overlay - shows true distribution from simulation data (may be normal, uniform, triangular, or multimodal)
 
 ### Multi-Unit Display
 
@@ -371,6 +386,7 @@ mils:   0.0254     (1 mil = 0.001 inch = 0.0254 mm)
 1. **Upload CSV** - Drag & drop or file select
 2. **Map Columns** - Match CSV columns to fields:
    - Item Name (required)
+   - Nominal (optional, defaults to 0 if not mapped)
    - Tolerance (+) (required)
    - Tolerance (-) (optional, uses + if not mapped in symmetric mode)
    - Float Factor (optional, accepts: "Yes"/"No", "1"/"0", "true"/"false", "√3", numeric values)
@@ -434,7 +450,7 @@ mils:   0.0254     (1 mil = 0.001 inch = 0.0254 mm)
 - **ToleranceTable:** Input fields clamp to min: 0, show error state if negative
 - **CSV Import:** `Math.max(0, parsedValue)` before creating items
 - **JSON Import:** Validates and clamps all tolerance values during load
-- **DirectionTab:** USL validated >= 0, LSL stored as negative value (user inputs absolute value)
+- **DirectionTab:** USL and LSL accept any value (positive or negative), no validation constraints
 - **SensitivityAnalysisDialog:**
   - Adjustment calculations prevent negative results
   - Slider range dynamically limited
@@ -485,9 +501,15 @@ Heavy reliance on MUI for professional UI components (Tables, Tabs, Chips, TextF
 ### UI Condensing Patterns
 
 **Table Optimization:**
-- **5 columns** (not 6): Item | Tolerance(±) | Tolerance(-) | Float (×√3) | Actions
-- "Float?" checkbox and "Float Factor" combined into single column
-- Shows inline factor value: `(1.732)` when checked, `(1.0)` when unchecked
+- **6 columns** (RSS/Worst-Case modes): Item | Nominal | Tolerance(±) | Tolerance(-) | Float (×√3) | Actions
+- **6 columns** (Monte Carlo mode with advanced distributions): Item | Nominal | Tolerance(±) | Tolerance(-) | Distribution | Actions
+- **Float column**: Shows ONLY in RSS/Worst-Case modes (not in Monte Carlo)
+  - "Float?" checkbox and "Float Factor" combined into single column
+  - Shows inline factor value: `(1.732)` when checked, `(1.0)` when unchecked
+  - Float factor √3 in deterministic modes corresponds to Uniform distribution in Monte Carlo
+- **Distribution column**: Shows ONLY in Monte Carlo mode when `useAdvancedDistributions` is enabled
+  - Dropdown with options: Normal, Uniform, Triangular
+  - Replaces the Float checkbox in Monte Carlo mode
 - `size="small"` for compact cells
 - `elevation={0}` with `variant="outlined"` for flatter appearance
 
@@ -513,16 +535,17 @@ Heavy reliance on MUI for professional UI components (Tables, Tabs, Chips, TextF
 |-----------|---------------|-------|--------------|
 | `App.tsx` | Root state holder, tab management, direction CRUD, global settings | `projectData`, `activeTab`, `settingsOpen`, `helpOpen` | App bar with project name, Settings & Help icons, calculation mode toggle |
 | `ProjectMetadataEditor.tsx` | Edit project metadata, units, and analysis settings | `editedMetadata`, `selectedUnit`, `editedSettings` | Dialog with auto-dates, multi-unit config, sensitivity increment |
-| `DirectionTab.tsx` | Grid container, description, USL/LSL inputs, RSS calculation | `rssResult`, `csvImportOpen`, `diagramOpen` (local) | Side-by-side layout, CSV import button, diagram button, USL and LSL fields |
-| `ToleranceTable.tsx` | Editable 5-column table, add/remove/duplicate items, notes dialog | `notesDialogOpen`, `editingItem`, `editNotes`, `editSource` | Notes icon (blue when data), duplicate icon, validation min:0 |
+| `DirectionTab.tsx` | Grid container, description, target nominal, USL/LSL inputs, RSS calculation | `rssResult`, `csvImportOpen`, `diagramOpen` (local) | Side-by-side layout, CSV import button, diagram button, target nominal, USL and LSL fields |
+| `ToleranceTable.tsx` | Editable 6-column table, add/remove/duplicate items, notes dialog, mode-specific columns | `notesDialogOpen`, `editingItem`, `editNotes`, `editSource` | Nominal column, Float column (RSS/Worst-Case only), Distribution column (Monte Carlo with useAdvancedDistributions only), notes icon (blue when data), duplicate icon, validation min:0 for tolerances |
 | `ResultsDisplay.tsx` | RSS/worst-case display, spec limit status, contributions, sensitivity | `showContributions`, `sensitivityOpen` (local) | Multi-unit support, USL/LSL chips (green/yellow/red), sensitivity button |
 | `FileControls.tsx` | Save/load JSON, export/import CSV | `snackbar` (local) | Compact buttons with success/error feedback |
 | `CSVImportDialog.tsx` | 3-step CSV import with column mapping | `activeStep`, `csvData`, `columnMapping`, `previewItems` | Stepper UI, drag-drop upload, column mapping dropdowns, preview table |
 | `SensitivityAnalysisDialog.tsx` | Interactive tolerance adjustment analysis | `adjustedItems`, `selectedItemId`, `currentTotal` | Dual input (slider + direct), dynamic limits, real-time RSS update, sensitivity metric |
 | `HelpDialog.tsx` | Comprehensive help documentation | None (stateless) | Expandable accordions, formulas, examples, best practices |
-| `DiagramBuilderDialog.tsx` | Visual diagram editor for tolerance stacks | `nodes`, `edges`, `hasChanges` (local) | React Flow integration, manual positioning, connectors, save/load diagram |
-| `DiagramCanvas.tsx` | React Flow wrapper with configuration | None (stateless) | Background grid, zoom/pan controls, minimap, custom node types |
+| `DiagramBuilderDialog.tsx` | Visual diagram editor for tolerance stacks | `nodes`, `edges`, `hasChanges` (local) | React Flow integration, manual positioning, selectable/deletable connectors, save/load diagram |
+| `DiagramCanvas.tsx` | React Flow wrapper with configuration | None (stateless) | Background grid, zoom/pan controls, minimap, custom node types, edge selection enabled |
 | `ToleranceItemNode.tsx` | Custom node displaying tolerance item | `expanded` (local) | Color-coded by float factor, collapsible metadata, connection handles |
+| `ResultNode.tsx` | Display stack summary results in diagram | None (stateless) | Green-themed node, shows target nominal/variance/RSS total, left handle only, non-deletable |
 
 ## Diagram Builder
 
@@ -539,6 +562,7 @@ Heavy reliance on MUI for professional UI components (Tables, Tabs, Chips, TextF
 | `DiagramBuilderDialog` | Main modal container, orchestrates diagram state | src/components/DiagramBuilderDialog.tsx |
 | `DiagramCanvas` | React Flow wrapper with grid, controls, minimap | src/components/DiagramCanvas.tsx |
 | `ToleranceItemNode` | Custom node displaying tolerance data | src/components/ToleranceItemNode.tsx |
+| `ResultNode` | Summary node showing stack results | src/components/ResultNode.tsx |
 
 ### Data Model
 
@@ -558,8 +582,9 @@ export interface Direction {
 **DiagramData Structure:**
 ```typescript
 export interface DiagramData {
-  nodes: DiagramNode[];           // Node positions (id matches ToleranceItem.id)
+  nodes: DiagramNode[];           // Node positions (tolerance items only)
   connectors: DiagramConnector[]; // Connections between nodes
+  resultNodePosition?: DiagramPosition;  // Result node position (optional, stored separately)
   viewport?: {                    // Saved zoom/pan state
     x: number;
     y: number;
@@ -578,6 +603,8 @@ export interface DiagramConnector {
   id: string;
   sourceNodeId: string;
   targetNodeId: string;
+  sourceHandleId?: string;  // Source handle ID (top/bottom/left/right)
+  targetHandleId?: string;  // Target handle ID (top/bottom/left/right)
   label?: string;          // User-defined label (generic meaning)
   animated?: boolean;
   style?: { strokeColor?: string; strokeWidth?: number };
@@ -588,16 +615,39 @@ export interface DiagramConnector {
 
 **Node Representation:**
 - Each box = one ToleranceItem
+- Rounded corners for clean appearance (borderRadius: 2 on container, matching radius on header)
 - Color coding: Blue (fixed, floatFactor=1.0), Orange (floating, floatFactor>1.0)
-- Displays: item name, tolerance (±), float factor
+- Displays: item name, nominal, tolerance (±), float factor
 - Collapsible metadata: source reference, notes
-- Connection handles on all 4 sides (top, right, bottom, left)
+- Connection handles on all 4 sides (top, right, bottom, left) - **fully functional**
+  - Each handle has explicit ID for reliable edge connections
+  - Handle positions: top/bottom for vertical flow, left/right for horizontal flow
+
+**Result Node:**
+- Automatic summary node displaying stack results
+- Always present, cannot be deleted (protected node)
+- Positioned on right side of tolerance items (default: 400px offset from rightmost item)
+- Green theme (#4caf50 gradient) to distinguish from tolerance items
+- Displays:
+  - Target Nominal (if set in DirectionTab)
+  - Variance (calculated nominal sum - target nominal, color-coded: green if ≥0, red if negative)
+  - RSS Total (±tolerance result)
+- Two connection handles on left side for incoming edges from tolerance items:
+  - left-top handle at 20% from top
+  - left-bottom handle at 80% from top
+- Position preserved across save/reload (stored in DiagramData.resultNodePosition)
+- Auto-regenerates if missing when diagram opens
+- Draggable for manual repositioning
 
 **Connectors:**
 - Generic relationships (user-defined meaning via labels)
 - Drag from handle to handle to create
-- Delete with Delete key or backspace
+- **Selectable:** Click on a connector to select it (turns blue and thicker)
+- **Deletable:** Select a connector and press Delete or Backspace key to remove
+- **Hover effect:** Connectors darken when hovered with pointer cursor
+- **Edge type:** Smooth step edges for clean appearance (preserved on save/reload)
 - Animated flow effect optional
+- Visual feedback: Selected edges are blue (#1976d2, 3px thick)
 
 **Layout:**
 - Manual positioning via drag-and-drop
@@ -622,8 +672,10 @@ export interface DiagramConnector {
 2. Dialog opens with existing diagram or auto-positioned nodes
 3. Drag nodes to desired positions
 4. Create connectors by dragging from node handles
-5. Click "Save" to persist diagram with Direction
-6. Diagram data exports/imports with project JSON
+5. **Select connectors:** Click on any connector to select it (turns blue)
+6. **Delete connectors:** Select a connector and press Delete or Backspace
+7. Click "Save" to persist diagram with Direction
+8. Diagram data exports/imports with project JSON
 
 ### Implementation Notes
 
@@ -637,6 +689,23 @@ export interface DiagramConnector {
 - Dirty flag tracks unsaved changes
 - Dialog reinitializes only when opened or direction ID changes
 
+**Edge Selection & Deletion:**
+- `deleteKeyCode={['Backspace', 'Delete']}` enables keyboard deletion
+- `edgesReconnectable={false}` prevents accidental reconnection
+- `multiSelectionKeyCode={null}` disables multi-selection for simplicity
+- All edges created with `type: 'smoothstep'` for consistent appearance
+- Custom CSS styling for visual feedback (blue when selected, darker on hover)
+- Edge type preserved on save/reload (stored in `defaultEdgeOptions`)
+
+**Handle Implementation:**
+- Handles extend beyond node boundaries for proper hit detection
+- No overflow clipping on parent container to ensure all handles accessible
+- Explicit IDs ("top", "bottom", "left", "right") for predictable edge behavior
+- Current types: top/left are targets (receive), bottom/right are sources (send)
+- All 4 handles functional and clickable with visible hover states
+- Handle IDs stored in DiagramConnector (sourceHandleId/targetHandleId) for precise edge restoration
+- Connections persist correctly across save/reload with exact handle positions preserved
+
 **Performance:**
 - React Flow handles 1000+ nodes efficiently
 - Custom nodes use `React.memo` to prevent unnecessary re-renders
@@ -649,6 +718,7 @@ export interface DiagramConnector {
 ### Future Enhancements (Not Yet Implemented)
 
 **Phase 2: Connectors & Editing**
+- ✓ Connector selection and deletion (IMPLEMENTED)
 - Connector labels (click edge to edit)
 - Inline node editing (double-click to edit tolerance values)
 - Connector animated flow toggle
@@ -670,7 +740,9 @@ Vite provides automatic HMR. Changes to `.tsx` files reload instantly without fu
 
 **Adding a new tolerance item field:**
 1. Update `ToleranceItem` interface in `src/types/index.ts`
-2. Modify `ToleranceTable.tsx` to add UI column (table has 5 columns currently)
+2. Modify `ToleranceTable.tsx` to add UI column (table has 6 columns - some are mode-specific)
+   - Note: Float column only appears in RSS/Worst-Case modes
+   - Note: Distribution column only appears in Monte Carlo mode with advanced distributions
 3. Update `handleItemChange` to handle new field
 4. Update `rssCalculator.ts` if field affects calculation
 5. Consider impact on `ResultsDisplay.tsx` contributions table
@@ -717,19 +789,25 @@ Unicode escapes don't render correctly in JSX strings.
 {
   id: `item-${Date.now()}`,
   name: `Item ${items.length + 1}`,
+  nominal: 0,                // Default nominal value
   tolerancePlus: 0.5,        // Non-zero default for meaningful calculations
   toleranceMinus: 0.5,
   floatFactor: 1.0,          // FLOAT_FACTORS.FIXED
 }
 ```
 
-**New Analysis Settings (App.tsx:43-49, fileHandlers.ts:41-47):**
+**New Analysis Settings (App.tsx:58-68, fileHandlers.ts:41-52):**
 ```typescript
 {
   calculationMode: 'rss',
   showMultiUnit: false,
   contributionThreshold: 40,  // Percentage for high-impact warnings
   sensitivityIncrement: 0.1,  // Slider step size
+  enableMonteCarlo: false,    // Monte Carlo is an advanced feature, disabled by default
+  monteCarloSettings: {
+    iterations: 50000,
+    useAdvancedDistributions: false,
+  },
 }
 ```
 

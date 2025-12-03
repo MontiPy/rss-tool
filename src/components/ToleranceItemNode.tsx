@@ -41,7 +41,7 @@ const ToleranceItemNode: React.FC<NodeProps<ToleranceItemNodeData>> = ({ data })
         border: `2px solid ${headerColor}`,
         borderRadius: 2,
         boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        overflow: 'hidden',
+        // overflow removed - allows handles to extend beyond node bounds for proper hit detection
         '&:hover': {
           boxShadow: '0 6px 12px rgba(0,0,0,0.15)',
         },
@@ -51,21 +51,25 @@ const ToleranceItemNode: React.FC<NodeProps<ToleranceItemNodeData>> = ({ data })
       <Handle
         type="target"
         position={Position.Top}
+        id="top"
         style={{ background: headerColor, width: 10, height: 10 }}
       />
       <Handle
         type="source"
         position={Position.Bottom}
+        id="bottom"
         style={{ background: headerColor, width: 10, height: 10 }}
       />
       <Handle
         type="target"
         position={Position.Left}
+        id="left"
         style={{ background: headerColor, width: 10, height: 10 }}
       />
       <Handle
         type="source"
         position={Position.Right}
+        id="right"
         style={{ background: headerColor, width: 10, height: 10 }}
       />
 
@@ -78,6 +82,8 @@ const ToleranceItemNode: React.FC<NodeProps<ToleranceItemNodeData>> = ({ data })
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          borderTopLeftRadius: 6,
+          borderTopRightRadius: 6,
         }}
       >
         <Typography variant="body1" sx={{ fontWeight: 600, flex: 1 }}>
@@ -87,6 +93,9 @@ const ToleranceItemNode: React.FC<NodeProps<ToleranceItemNodeData>> = ({ data })
 
       {/* Main Content */}
       <Box sx={{ p: 1.5 }}>
+        <Typography variant="body2" sx={{ mb: 0.5 }}>
+          <strong>Nominal:</strong> {(item.nominal ?? 0).toFixed(3)} {unit}
+        </Typography>
         <Typography variant="body2" sx={{ mb: 0.5 }}>
           <strong>Tolerance:</strong> {toleranceDisplay}
         </Typography>

@@ -278,7 +278,31 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
           <Grid item xs={12}>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" gutterBottom>
-              Monte Carlo Settings
+              Advanced Features
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={editedSettings.enableMonteCarlo}
+                  onChange={(e) =>
+                    setEditedSettings({ ...editedSettings, enableMonteCarlo: e.target.checked })
+                  }
+                />
+              }
+              label="Enable Monte Carlo Simulation"
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
+              When enabled, Monte Carlo option will appear in the Calculation Mode selector.
+              Monte Carlo is a probabilistic simulation method for tolerance analysis.
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Typography variant="body2" sx={{ mt: 2, fontWeight: 600 }}>
+              Monte Carlo Configuration
             </Typography>
           </Grid>
 

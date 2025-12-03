@@ -60,6 +60,7 @@ function App() {
       showMultiUnit: false,
       contributionThreshold: 40,
       sensitivityIncrement: 0.1,
+      enableMonteCarlo: false,
       monteCarloSettings: {
         iterations: 50000,
         useAdvancedDistributions: false,
@@ -248,11 +249,13 @@ function App() {
                     control={<Radio />}
                     label="Worst-Case"
                   />
-                  <FormControlLabel
-                    value="monteCarlo"
-                    control={<Radio />}
-                    label="Monte Carlo"
-                  />
+                  {projectData.analysisSettings?.enableMonteCarlo && (
+                    <FormControlLabel
+                      value="monteCarlo"
+                      control={<Radio />}
+                      label="Monte Carlo"
+                    />
+                  )}
                 </RadioGroup>
               </FormControl>
             </Box>

@@ -104,13 +104,15 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
     let min = -sigmaRange;
     let max = sigmaRange;
 
-    if (lsl !== undefined && lsl < 0) {
-      const lslExtended = lsl * 1.1; // LSL - 10%
+    if (lsl !== undefined) {
+      // Extend LSL downward by 10%
+      const lslExtended = lsl < 0 ? lsl * 1.1 : lsl * 0.9;
       min = Math.min(min, lslExtended);
     }
 
-    if (usl !== undefined && usl > 0) {
-      const uslExtended = usl * 1.1; // USL + 10%
+    if (usl !== undefined) {
+      // Extend USL upward by 10%
+      const uslExtended = usl > 0 ? usl * 1.1 : usl * 0.9;
       max = Math.max(max, uslExtended);
     }
 
@@ -212,8 +214,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   };
 
   // Specification limit comparison logic
-  const hasUSL = usl !== undefined && usl > 0;
-  const hasLSL = lsl !== undefined && lsl < 0;
+  const hasUSL = usl !== undefined;
+  const hasLSL = lsl !== undefined;
   const hasLimits = hasUSL || hasLSL;
 
   let specStatus: 'pass' | 'warning' | 'fail' = 'pass';
@@ -223,8 +225,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   let exceedsLSL = false;
 
   if (hasUSL) {
-    uslUtilization = (totalPlus / usl!) * 100;
-    exceedsUSL = totalPlus > usl!;
+    const uslMagnitude = Math.abs(usl!);
+    uslUtilization = (totalPlus / uslMagnitude) * 100;
+    exceedsUSL = totalPlus > uslMagnitude;
     if (uslUtilization > 100) {
       specStatus = 'fail';
     } else if (uslUtilization > 90) {
@@ -233,8 +236,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   }
 
   if (hasLSL) {
-    lslUtilization = (totalMinus / Math.abs(lsl!)) * 100;
-    exceedsLSL = totalMinus > Math.abs(lsl!);
+    const lslMagnitude = Math.abs(lsl!);
+    lslUtilization = (totalMinus / lslMagnitude) * 100;
+    exceedsLSL = totalMinus > lslMagnitude;
     if (lslUtilization > 100) {
       specStatus = 'fail';
     } else if (lslUtilization > 90 && specStatus === 'pass') {
@@ -698,44 +702,19 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={(() => {
                 // Calculate viewport domain based on user settings
-                const mean = result.monteCarloResult.percentiles.mean;
                 const std = result.monteCarloResult.percentiles.stdDev;
                 const viewportDomain = calculateXAxisDomain(std, usl, lsl);
 
-                // Generate histogram bins (filtered to viewport)
+                // Generate histogram bins (filtered to viewport) - show actual distribution shape
                 const histogramData = result.monteCarloResult.histogram
                   .filter(bin => bin.binCenter >= viewportDomain.min && bin.binCenter <= viewportDomain.max)
                   .map(bin => ({
                     x: bin.binCenter,
                     frequency: bin.frequency,
                     count: bin.count,
-                    pdf: undefined as number | undefined,
                   }));
 
-                // Generate smooth PDF curve (300 samples across viewport range)
-                const minX = viewportDomain.min;
-                const maxX = viewportDomain.max;
-                const range = maxX - minX;
-                const samples = 300;
-
-                // Calculate max PDF for normalization
-                const maxHistFreq = Math.max(...result.monteCarloResult.histogram.map(b => b.frequency));
-                const maxPdfValue = normalPdf(mean, mean, std);
-                const scaleFactor = maxHistFreq / maxPdfValue;
-
-                const curveData = Array.from({ length: samples }, (_, i) => {
-                  const x = minX + (i / (samples - 1)) * range;
-                  const pdfValue = normalPdf(x, mean, std) * scaleFactor;
-                  return {
-                    x: x,
-                    frequency: undefined as number | undefined,
-                    count: undefined,
-                    pdf: pdfValue,
-                  };
-                });
-
-                // Combine datasets (histogram + curve)
-                return [...histogramData, ...curveData].sort((a, b) => a.x - b.x);
+                return histogramData;
               })()}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis
@@ -856,13 +835,6 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                     const itemContrib = result.monteCarloResult!.itemContributions.find(ic => ic.itemId === item.id);
                     if (!itemContrib) return null;
 
-                    // Calculate item statistics from histogram for PDF curve
-                    const itemMean = itemHistogram.reduce((sum, bin) => sum + bin.binCenter * bin.frequency, 0);
-                    const itemVariance = itemHistogram.reduce((sum, bin) =>
-                      sum + Math.pow(bin.binCenter - itemMean, 2) * bin.frequency, 0
-                    );
-                    const itemStd = Math.sqrt(itemVariance);
-
                     return (
                       <Paper key={item.id} elevation={0} variant="outlined" sx={{ p: 2, mb: 1 }}>
                         <Typography variant="caption" sx={{ fontWeight: 'bold', mb: 1, display: 'block' }}>
@@ -870,35 +842,13 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                         </Typography>
                         <ResponsiveContainer width="100%" height={200}>
                           <ComposedChart data={(() => {
-                            // Histogram data
+                            // Show actual distribution shape without curve assumption
                             const histData = itemHistogram.map(bin => ({
                               x: bin.binCenter,
                               frequency: bin.frequency,
-                              pdf: undefined as number | undefined,
+                              count: bin.count,
                             }));
-
-                            // Generate PDF curve (200 samples)
-                            const minX = Math.min(...itemHistogram.map(b => b.binStart));
-                            const maxX = Math.max(...itemHistogram.map(b => b.binEnd));
-                            const range = maxX - minX;
-                            const samples = 200;
-
-                            // Normalize PDF to histogram scale
-                            const maxHistFreq = Math.max(...itemHistogram.map(b => b.frequency));
-                            const maxPdfValue = normalPdf(itemMean, itemMean, itemStd);
-                            const scaleFactor = maxHistFreq / maxPdfValue;
-
-                            const curveData = Array.from({ length: samples }, (_, i) => {
-                              const x = minX + (i / (samples - 1)) * range;
-                              const pdfValue = normalPdf(x, itemMean, itemStd) * scaleFactor;
-                              return {
-                                x: x,
-                                frequency: undefined as number | undefined,
-                                pdf: pdfValue,
-                              };
-                            });
-
-                            return [...histData, ...curveData].sort((a, b) => a.x - b.x);
+                            return histData;
                           })()}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                             <XAxis
@@ -925,21 +875,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                             <RechartsTooltip
                               formatter={(value: number, name: string) => {
                                 if (name === 'frequency') return [(value * 100).toFixed(2) + '%', 'Frequency'];
-                                if (name === 'pdf') return [(value * 100).toFixed(2) + '%', 'PDF'];
                                 return [value, name];
                               }}
                               labelFormatter={(value) => `x = ${Number(value).toFixed(4)}`}
                             />
                             <Bar dataKey="frequency" fill="rgba(150, 150, 150, 0.5)" />
-                            <Line
-                              type="monotone"
-                              dataKey="pdf"
-                              stroke="#1976d2"
-                              strokeWidth={2}
-                              dot={false}
-                              connectNulls={false}
-                              isAnimationActive={false}
-                            />
                           </ComposedChart>
                         </ResponsiveContainer>
                       </Paper>

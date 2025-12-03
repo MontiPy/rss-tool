@@ -218,15 +218,15 @@ export function runMonteCarloSimulation(
 
   // Risk analysis (if specification limits provided)
   let riskAnalysis;
-  if ((usl !== undefined && usl > 0) || (lsl !== undefined && lsl < 0)) {
-    // Count samples exceeding USL (positive values exceeding upper limit)
-    const exceedingUSL = usl !== undefined && usl > 0
+  if (usl !== undefined || lsl !== undefined) {
+    // Count samples exceeding USL (values greater than upper limit)
+    const exceedingUSL = usl !== undefined
       ? stackSamples.filter(x => x > usl).length
       : 0;
     const probabilityExceedingUSL = exceedingUSL / iterations;
 
-    // Count samples exceeding LSL (negative values exceeding lower limit)
-    const exceedingLSL = lsl !== undefined && lsl < 0
+    // Count samples exceeding LSL (values less than lower limit)
+    const exceedingLSL = lsl !== undefined
       ? stackSamples.filter(x => x < lsl).length
       : 0;
     const probabilityExceedingLSL = exceedingLSL / iterations;
@@ -236,8 +236,8 @@ export function runMonteCarloSimulation(
     const expectedDefectRate = probabilityOutOfSpec * 1_000_000; // PPM
 
     riskAnalysis = {
-      usl: usl !== undefined && usl > 0 ? usl : undefined,
-      lsl: lsl !== undefined && lsl < 0 ? lsl : undefined,
+      usl: usl !== undefined ? usl : undefined,
+      lsl: lsl !== undefined ? lsl : undefined,
       probabilityExceedingUSL,
       probabilityExceedingLSL,
       probabilityOutOfSpec,

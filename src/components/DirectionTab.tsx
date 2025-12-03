@@ -113,7 +113,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
     const value = parseFloat(usl);
     onDirectionChange({
       ...direction,
-      usl: isNaN(value) || value === 0 ? undefined : Math.max(0, value),
+      usl: isNaN(value) || value === 0 ? undefined : value,
     });
   };
 
@@ -121,7 +121,15 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
     const value = parseFloat(lsl);
     onDirectionChange({
       ...direction,
-      lsl: isNaN(value) || value === 0 ? undefined : -Math.abs(value), // Always store as negative
+      lsl: isNaN(value) || value === 0 ? undefined : value,
+    });
+  };
+
+  const handleTargetNominalChange = (targetNominal: string) => {
+    const value = parseFloat(targetNominal);
+    onDirectionChange({
+      ...direction,
+      targetNominal: isNaN(value) ? undefined : value,
     });
   };
 
@@ -152,7 +160,21 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
               variant="outlined"
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={4} md={2}>
+            <TextField
+              label={`Target Nominal (${unit})`}
+              value={direction.targetNominal !== undefined ? direction.targetNominal : ''}
+              onChange={(e) => handleTargetNominalChange(e.target.value)}
+              fullWidth
+              size="small"
+              type="number"
+              placeholder="Target"
+              variant="outlined"
+              inputProps={{ step: 0.001 }}
+              helperText="Target dimension"
+            />
+          </Grid>
+          <Grid item xs={12} sm={4} md={2}>
             <TextField
               label={`USL (${unit})`}
               value={direction.usl !== undefined ? direction.usl : ''}
@@ -162,22 +184,22 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
               type="number"
               placeholder="Upper Limit"
               variant="outlined"
-              inputProps={{ step: 0.01, min: 0 }}
+              inputProps={{ step: 0.01 }}
               helperText="Upper spec limit"
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={4} md={2}>
             <TextField
               label={`LSL (${unit})`}
-              value={direction.lsl !== undefined ? Math.abs(direction.lsl) : ''}
+              value={direction.lsl !== undefined ? direction.lsl : ''}
               onChange={(e) => handleLSLChange(e.target.value)}
               fullWidth
               size="small"
               type="number"
               placeholder="Lower Limit"
               variant="outlined"
-              inputProps={{ step: 0.01, min: 0 }}
-              helperText="Lower spec limit (absolute)"
+              inputProps={{ step: 0.01 }}
+              helperText="Lower spec limit"
             />
           </Grid>
         </Grid>
@@ -206,6 +228,8 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
             items={direction.items}
             toleranceMode={toleranceMode}
             onItemsChange={handleItemsChange}
+            calculationMode={calculationMode}
+            useAdvancedDistributions={analysisSettings?.monteCarloSettings?.useAdvancedDistributions}
           />
         </Grid>
         <Grid item xs={12} md={5}>
@@ -237,6 +261,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
         direction={direction}
         toleranceMode={toleranceMode}
         unit={unit}
+        rssResult={rssResult}
         onSave={handleDiagramSave}
       />
     </Box>

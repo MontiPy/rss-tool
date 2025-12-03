@@ -16,8 +16,9 @@ import {
   useNodesState,
   useEdgesState,
   MarkerType,
+  NodeChange,
 } from 'reactflow';
-import { Direction, ToleranceMode, ToleranceUnit, DiagramData, DiagramNode, DiagramConnector } from '../types';
+import { Direction, ToleranceMode, ToleranceUnit, DiagramData, DiagramNode, DiagramConnector, RSSResult, ResultNodeData } from '../types';
 import DiagramCanvas from './DiagramCanvas';
 import { ToleranceItemNodeData } from './ToleranceItemNode';
 
@@ -27,6 +28,7 @@ interface DiagramBuilderDialogProps {
   direction: Direction;
   toleranceMode: ToleranceMode;
   unit: ToleranceUnit;
+  rssResult: RSSResult | null;
   onSave: (updatedDirection: Direction) => void;
 }
 
@@ -36,6 +38,7 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
   direction,
   toleranceMode,
   unit,
+  rssResult,
   onSave,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -80,13 +83,55 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
       });
     });
 
+    // Calculate nominal sum for result node
+    const calculatedNominal = direction.items.reduce((sum, item) => sum + (item.nominal ?? 0), 0);
+    const variance = direction.targetNominal !== undefined
+      ? calculatedNominal - direction.targetNominal
+      : 0;
+
+    // Create result node (always present)
+    const resultNodeId = `result-${direction.id}`;
+    const existingResultNode = existingDiagram?.resultNodePosition;
+
+    // Position: right side of tolerance items
+    // Calculate rightmost x position + offset
+    const maxX = newNodes.length > 0
+      ? Math.max(...newNodes.map(n => n.position.x))
+      : 100;
+    const resultPosition = existingResultNode
+      ? existingResultNode
+      : { x: maxX + 400, y: 100 };  // 400px to the right, align with top
+
+    const resultNode: Node<ResultNodeData> = {
+      id: resultNodeId,
+      type: 'result',
+      position: resultPosition,
+      data: {
+        targetNominal: direction.targetNominal,
+        calculatedNominal,
+        variance,
+        rssTotal: rssResult?.totalPlus ?? 0,
+        unit,
+        directionId: direction.id,
+        directionName: direction.name,
+      },
+      // Make result node non-deletable
+      deletable: false,
+      draggable: true,  // Allow repositioning
+    };
+
+    newNodes.push(resultNode);
+
     // Convert saved connectors to React Flow edges
     const newEdges: Edge[] = existingDiagram?.connectors.map(connector => ({
       id: connector.id,
       source: connector.sourceNodeId,
       target: connector.targetNodeId,
+      sourceHandle: connector.sourceHandleId ?? null,
+      targetHandle: connector.targetHandleId ?? null,
       label: connector.label,
       animated: connector.animated || false,
+      type: 'smoothstep',  // Preserve edge type on reload
       style: {
         stroke: connector.style?.strokeColor || '#888',
         strokeWidth: connector.style?.strokeWidth || 2,
@@ -125,19 +170,40 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
     setHasChanges(true);
   }, []);
 
+  // Custom nodes change handler that protects result node from deletion
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    // Filter out deletion attempts on result node
+    const filteredChanges = changes.filter(change => {
+      if (change.type === 'remove') {
+        const node = nodes.find(n => n.id === change.id);
+        return node?.type !== 'result';  // Prevent result node deletion
+      }
+      return true;
+    });
+
+    onNodesChange(filteredChanges);
+  }, [nodes, onNodesChange]);
+
   // Convert React Flow state back to DiagramData
   const convertToDiagramData = (): DiagramData => {
-    const diagramNodes: DiagramNode[] = nodes.map(node => ({
-      id: node.id,
-      position: node.position,
-      width: node.width ?? undefined,
-      height: node.height ?? undefined,
-    }));
+    // Find result node and filter it out from regular nodes
+    const resultNode = nodes.find(n => n.type === 'result');
+
+    const diagramNodes: DiagramNode[] = nodes
+      .filter(node => node.type !== 'result')  // Exclude result node
+      .map(node => ({
+        id: node.id,
+        position: node.position,
+        width: node.width ?? undefined,
+        height: node.height ?? undefined,
+      }));
 
     const connectors: DiagramConnector[] = edges.map(edge => ({
       id: edge.id || `${edge.source}-${edge.target}`,
       sourceNodeId: edge.source,
       targetNodeId: edge.target,
+      sourceHandleId: edge.sourceHandle ?? undefined,
+      targetHandleId: edge.targetHandle ?? undefined,
       label: edge.label as string | undefined,
       animated: edge.animated,
       style: {
@@ -149,6 +215,7 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
     return {
       nodes: diagramNodes,
       connectors,
+      resultNodePosition: resultNode ? resultNode.position : undefined,  // Save result node position separately
     };
   };
 
@@ -190,9 +257,14 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
     >
       <DialogTitle>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">
-            Stack Diagram: {direction.name}
-          </Typography>
+          <Box>
+            <Typography variant="h6">
+              Stack Diagram: {direction.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Click connectors to select, press Delete/Backspace to remove
+            </Typography>
+          </Box>
           {hasChanges && (
             <Typography variant="caption" color="warning.main">
               Unsaved changes
@@ -205,7 +277,7 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
         <DiagramCanvas
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
         />

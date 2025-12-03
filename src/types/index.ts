@@ -29,6 +29,7 @@ export type ToleranceUnit = 'mm' | 'inches' | 'μm' | 'mils';
 export interface ToleranceItem {
   id: string;
   name: string;
+  nominal: number; // Nominal dimension value (default: 0)
   // For symmetric: tolerancePlus = toleranceMinus
   // For asymmetric: different values
   tolerancePlus: number;
@@ -65,6 +66,8 @@ export interface DiagramConnector {
   id: string;                    // Unique connector ID
   sourceNodeId: string;          // Source node ID
   targetNodeId: string;          // Target node ID
+  sourceHandleId?: string;       // Source handle ID (top/bottom/left/right)
+  targetHandleId?: string;       // Target handle ID (top/bottom/left/right)
   label?: string;                // User-defined label (generic meaning)
   animated?: boolean;            // Animated flow effect
   style?: {
@@ -74,11 +77,25 @@ export interface DiagramConnector {
 }
 
 /**
+ * Data for Result Node in diagram
+ */
+export interface ResultNodeData {
+  targetNominal?: number;       // User-defined target dimension
+  calculatedNominal: number;    // Sum of all item nominals
+  variance: number;             // calculatedNominal - targetNominal
+  rssTotal: number;             // Total RSS tolerance (plus direction)
+  unit: ToleranceUnit;          // Display unit
+  directionId: string;          // Parent direction ID
+  directionName: string;        // Parent direction name
+}
+
+/**
  * Complete diagram data for a direction
  */
 export interface DiagramData {
-  nodes: DiagramNode[];          // Node positions
+  nodes: DiagramNode[];          // Node positions (tolerance items only)
   connectors: DiagramConnector[];// Connections
+  resultNodePosition?: DiagramPosition;  // Result node position (optional, stored separately)
   viewport?: {                   // Saved zoom/pan state
     x: number;
     y: number;
@@ -94,8 +111,9 @@ export interface Direction {
   name: string;
   description?: string; // Optional description of what this direction represents
   items: ToleranceItem[];
-  usl?: number; // Upper Specification Limit (positive tolerance limit)
-  lsl?: number; // Lower Specification Limit (negative tolerance limit)
+  usl?: number; // Upper Specification Limit (any value allowed)
+  lsl?: number; // Lower Specification Limit (any value allowed)
+  targetNominal?: number; // User-defined target dimension for the stack
   targetBudget?: number; // DEPRECATED: Backward compatibility only, use usl/lsl instead
   diagram?: DiagramData; // Optional diagram visualization data
 }
@@ -182,6 +200,7 @@ export interface AnalysisSettings {
   secondaryUnit?: ToleranceUnit; // Secondary unit for multi-unit display
   contributionThreshold: number; // Alert threshold for high-impact items (default: 40%)
   sensitivityIncrement: number; // Increment for sensitivity analysis slider (default: 0.1)
+  enableMonteCarlo: boolean; // Enable Monte Carlo simulation mode (advanced feature, default: false)
   monteCarloSettings?: MonteCarloSettings; // Monte Carlo simulation configuration
 }
 

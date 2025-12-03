@@ -43,6 +43,7 @@ export function importFromJSON(file: File): Promise<ProjectData> {
             showMultiUnit: data.analysisSettings?.showMultiUnit || false,
             contributionThreshold: data.analysisSettings?.contributionThreshold || 40,
             sensitivityIncrement: data.analysisSettings?.sensitivityIncrement || 0.1,
+            enableMonteCarlo: data.analysisSettings?.enableMonteCarlo || false,
             secondaryUnit: data.analysisSettings?.secondaryUnit,
             monteCarloSettings: {
               iterations: data.analysisSettings?.monteCarloSettings?.iterations || 50000,
@@ -68,6 +69,8 @@ export function importFromJSON(file: File): Promise<ProjectData> {
               // Keep targetBudget for backward compatibility in the data structure
               items: dir.items.map((item) => ({
               ...item,
+              // Backward compatibility: default nominal to 0 if not present
+              nominal: item.nominal !== undefined ? item.nominal : 0,
               // Ensure tolerances are non-negative
               tolerancePlus: Math.max(0, item.tolerancePlus || 0),
               toleranceMinus: Math.max(0, item.toleranceMinus || 0),
