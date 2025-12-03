@@ -397,6 +397,7 @@ function App() {
           showMultiUnit: false,
           contributionThreshold: 40,
           sensitivityIncrement: 0.1,
+          enableMonteCarlo: false,
         }}
         onClose={() => setSettingsOpen(false)}
         onSave={handleSaveMetadata}

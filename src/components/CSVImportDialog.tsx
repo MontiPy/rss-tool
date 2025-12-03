@@ -260,6 +260,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
     setHeaders([]);
     setColumnMapping({
       name: '',
+      nominal: '',
       tolerancePlus: '',
       toleranceMinus: '',
       floatFactor: '',

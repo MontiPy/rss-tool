@@ -62,7 +62,7 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
   // Initialize diagram: convert Direction.items to React Flow nodes
   const initializeDiagram = () => {
     const existingDiagram = direction.diagram;
-    const newNodes: Node<ToleranceItemNodeData>[] = [];
+    const newNodes: Node<ToleranceItemNodeData | ResultNodeData>[] = [];
 
     direction.items.forEach((item, index) => {
       // Find existing position from saved diagram

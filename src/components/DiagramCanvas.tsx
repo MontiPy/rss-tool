@@ -63,7 +63,6 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         minZoom={0.1}
         maxZoom={2}
         selectNodesOnDrag={false}
-        edgesReconnectable={false}
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode={null}
         defaultEdgeOptions={{

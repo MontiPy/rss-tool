@@ -32,7 +32,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { RSSResult, ToleranceUnit, CalculationMode, AnalysisSettings, ToleranceItem } from '../types';
-import { formatWithMultiUnit, normalPdf, generateRSSDistribution } from '../utils/rssCalculator';
+import { formatWithMultiUnit, generateRSSDistribution } from '../utils/rssCalculator';
 import SensitivityAnalysisDialog from './SensitivityAnalysisDialog';
 import { MONOSPACE_FONT } from '../App';
 import {
