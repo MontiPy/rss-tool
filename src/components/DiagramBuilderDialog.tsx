@@ -123,24 +123,32 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
     newNodes.push(resultNode);
 
     // Convert saved connectors to React Flow edges
-    const newEdges: Edge[] = existingDiagram?.connectors.map(connector => ({
-      id: connector.id,
-      source: connector.sourceNodeId,
-      target: connector.targetNodeId,
-      sourceHandle: connector.sourceHandleId ?? null,
-      targetHandle: connector.targetHandleId ?? null,
-      label: connector.label,
-      animated: connector.animated || false,
-      type: 'smoothstep',  // Preserve edge type on reload
-      style: {
-        stroke: connector.style?.strokeColor || '#888',
-        strokeWidth: connector.style?.strokeWidth || 2,
-      },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: connector.style?.strokeColor || '#888',
-      },
-    })) || [];
+    const newEdges: Edge[] = existingDiagram?.connectors.map(connector => {
+      // Check if target is a result node (arrows only to result node)
+      const isTargetResultNode = connector.targetNodeId.startsWith('result-');
+
+      return {
+        id: connector.id,
+        source: connector.sourceNodeId,
+        target: connector.targetNodeId,
+        sourceHandle: connector.sourceHandleId ?? null,
+        targetHandle: connector.targetHandleId ?? null,
+        label: connector.label,
+        animated: connector.animated || false,
+        type: 'smoothstep',  // Preserve edge type on reload
+        style: {
+          stroke: connector.style?.strokeColor || '#888',
+          strokeWidth: connector.style?.strokeWidth || 2,
+        },
+        // Only add arrow marker if target is result node
+        ...(isTargetResultNode && {
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: connector.style?.strokeColor || '#888',
+          },
+        }),
+      };
+    }) || [];
 
     setNodes(newNodes);
     setEdges(newEdges);
@@ -152,6 +160,9 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
     // Ensure source and target are valid strings
     if (!connection.source || !connection.target) return;
 
+    // Check if target is a result node (arrows only to result node)
+    const isTargetResultNode = connection.target.startsWith('result-');
+
     const newEdge: Edge = {
       id: `e${connection.source}-${connection.target}-${Date.now()}`,
       source: connection.source,
@@ -161,10 +172,13 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
       animated: false,
       type: 'smoothstep',
       style: { stroke: '#888', strokeWidth: 2 },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: '#888',
-      },
+      // Only add arrow marker if target is result node
+      ...(isTargetResultNode && {
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: '#888',
+        },
+      }),
     };
     setEdges((eds) => addEdge(newEdge, eds));
     setHasChanges(true);

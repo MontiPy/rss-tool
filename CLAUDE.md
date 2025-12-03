@@ -642,6 +642,9 @@ export interface DiagramConnector {
 **Connectors:**
 - Generic relationships (user-defined meaning via labels)
 - Drag from handle to handle to create
+- **Directional logic:**
+  - Edges between tolerance nodes: No arrows (bidirectional appearance)
+  - Edges to result node: Arrows pointing into result node (directional)
 - **Selectable:** Click on a connector to select it (turns blue and thicker)
 - **Deletable:** Select a connector and press Delete or Backspace key to remove
 - **Hover effect:** Connectors darken when hovered with pointer cursor
