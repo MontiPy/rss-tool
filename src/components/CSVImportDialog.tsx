@@ -38,6 +38,7 @@ interface CSVImportDialogProps {
 
 interface ColumnMapping {
   name: string;
+  nominal: string;
   tolerancePlus: string;
   toleranceMinus: string;
   floatFactor: string;
@@ -56,6 +57,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
   const [headers, setHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
     name: '',
+    nominal: '',
     tolerancePlus: '',
     toleranceMinus: '',
     floatFactor: '',
@@ -120,6 +122,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
         // Auto-detect column mappings based on common header names
         const autoMapping: ColumnMapping = {
           name: '',
+          nominal: '',
           tolerancePlus: '',
           toleranceMinus: '',
           floatFactor: '',
@@ -132,6 +135,8 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
 
           if (normalized.includes('name') || normalized.includes('item') || normalized.includes('description')) {
             autoMapping.name = index.toString();
+          } else if (normalized.includes('nominal') || normalized === 'nom') {
+            autoMapping.nominal = index.toString();
           } else if (normalized.includes('tolerance') && (normalized.includes('+') || normalized.includes('plus') || normalized.includes('positive'))) {
             autoMapping.tolerancePlus = index.toString();
           } else if (normalized.includes('tolerance') && (normalized.includes('-') || normalized.includes('minus') || normalized.includes('negative'))) {
@@ -198,6 +203,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
     try {
       const items: ToleranceItem[] = csvData.map((row, index) => {
         const nameIndex = parseInt(columnMapping.name);
+        const nominalIndex = columnMapping.nominal ? parseInt(columnMapping.nominal) : -1;
         const plusIndex = parseInt(columnMapping.tolerancePlus);
         const minusIndex = columnMapping.toleranceMinus ? parseInt(columnMapping.toleranceMinus) : plusIndex;
         const floatIndex = columnMapping.floatFactor ? parseInt(columnMapping.floatFactor) : -1;
@@ -220,9 +226,13 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
           }
         }
 
+        // Parse nominal value
+        const nominal = nominalIndex >= 0 ? (parseFloat(row[nominalIndex]) || 0) : 0;
+
         return {
           id: `item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
           name: row[nameIndex] || `Item ${index + 1}`,
+          nominal,
           tolerancePlus,
           toleranceMinus,
           floatFactor,
@@ -250,6 +260,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
     setHeaders([]);
     setColumnMapping({
       name: '',
+      nominal: '',
       tolerancePlus: '',
       toleranceMinus: '',
       floatFactor: '',
@@ -341,6 +352,24 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
                 >
                   <MenuItem value="">
                     <em>-- Select Column --</em>
+                  </MenuItem>
+                  {headers.map((header, index) => (
+                    <MenuItem key={index} value={index.toString()}>
+                      {header || `Column ${index + 1}`}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth>
+                <InputLabel>Nominal (Optional)</InputLabel>
+                <Select
+                  value={columnMapping.nominal}
+                  label="Nominal (Optional)"
+                  onChange={(e) => handleMappingChange('nominal', e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>-- None (defaults to 0) --</em>
                   </MenuItem>
                   {headers.map((header, index) => (
                     <MenuItem key={index} value={index.toString()}>

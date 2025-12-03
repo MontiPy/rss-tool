@@ -43,14 +43,34 @@ export function importFromJSON(file: File): Promise<ProjectData> {
             showMultiUnit: data.analysisSettings?.showMultiUnit || false,
             contributionThreshold: data.analysisSettings?.contributionThreshold || 40,
             sensitivityIncrement: data.analysisSettings?.sensitivityIncrement || 0.1,
+            enableMonteCarlo: data.analysisSettings?.enableMonteCarlo || false,
             secondaryUnit: data.analysisSettings?.secondaryUnit,
+            monteCarloSettings: {
+              iterations: data.analysisSettings?.monteCarloSettings?.iterations || 50000,
+              useAdvancedDistributions: data.analysisSettings?.monteCarloSettings?.useAdvancedDistributions || false,
+            },
           },
-          directions: data.directions.map((dir) => ({
-            ...dir,
-            description: dir.description || undefined, // Optional field
-            targetBudget: dir.targetBudget || undefined, // Optional field
-            items: dir.items.map((item) => ({
+          directions: data.directions.map((dir) => {
+            // Backward compatibility: convert targetBudget to USL/LSL
+            let usl = dir.usl;
+            let lsl = dir.lsl;
+
+            // If old targetBudget exists but no USL/LSL, convert it
+            if (dir.targetBudget !== undefined && dir.targetBudget > 0 && usl === undefined && lsl === undefined) {
+              usl = dir.targetBudget;
+              lsl = -dir.targetBudget;
+            }
+
+            return {
+              ...dir,
+              description: dir.description || undefined, // Optional field
+              usl: usl || undefined,
+              lsl: lsl || undefined,
+              // Keep targetBudget for backward compatibility in the data structure
+              items: dir.items.map((item) => ({
               ...item,
+              // Backward compatibility: default nominal to 0 if not present
+              nominal: item.nominal !== undefined ? item.nominal : 0,
               // Ensure tolerances are non-negative
               tolerancePlus: Math.max(0, item.tolerancePlus || 0),
               toleranceMinus: Math.max(0, item.toleranceMinus || 0),
@@ -61,7 +81,8 @@ export function importFromJSON(file: File): Promise<ProjectData> {
               notes: item.notes || undefined, // Optional field
               source: item.source || undefined, // Optional field
             })),
-          })),
+            };
+          }),
         };
 
         resolve(enhancedData);
