@@ -85,9 +85,6 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
 
     // Calculate nominal sum for result node
     const calculatedNominal = direction.items.reduce((sum, item) => sum + (item.nominal ?? 0), 0);
-    const variance = direction.targetNominal !== undefined
-      ? calculatedNominal - direction.targetNominal
-      : 0;
 
     // Create result node (always present)
     const resultNodeId = `result-${direction.id}`;
@@ -109,7 +106,6 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
       data: {
         targetNominal: direction.targetNominal,
         calculatedNominal,
-        variance,
         rssTotal: rssResult?.totalPlus ?? 0,
         unit,
         directionId: direction.id,

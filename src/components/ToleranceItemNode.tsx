@@ -48,6 +48,7 @@ const ToleranceItemNode: React.FC<NodeProps<ToleranceItemNodeData>> = ({ data })
       }}
     >
       {/* Connection Handles */}
+      {/* Top handles - both source and target */}
       <Handle
         type="target"
         position={Position.Top}
@@ -56,10 +57,26 @@ const ToleranceItemNode: React.FC<NodeProps<ToleranceItemNodeData>> = ({ data })
       />
       <Handle
         type="source"
+        position={Position.Top}
+        id="top-source"
+        style={{ background: headerColor, width: 10, height: 10 }}
+      />
+
+      {/* Bottom handles - both source and target */}
+      <Handle
+        type="target"
         position={Position.Bottom}
         id="bottom"
         style={{ background: headerColor, width: 10, height: 10 }}
       />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="bottom-source"
+        style={{ background: headerColor, width: 10, height: 10 }}
+      />
+
+      {/* Left handles - both source and target */}
       <Handle
         type="target"
         position={Position.Left}
@@ -68,8 +85,22 @@ const ToleranceItemNode: React.FC<NodeProps<ToleranceItemNodeData>> = ({ data })
       />
       <Handle
         type="source"
+        position={Position.Left}
+        id="left-source"
+        style={{ background: headerColor, width: 10, height: 10 }}
+      />
+
+      {/* Right handles - both source and target */}
+      <Handle
+        type="target"
         position={Position.Right}
         id="right"
+        style={{ background: headerColor, width: 10, height: 10 }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right-source"
         style={{ background: headerColor, width: 10, height: 10 }}
       />
 

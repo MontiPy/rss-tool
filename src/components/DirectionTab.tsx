@@ -239,6 +239,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
             directionId={direction.id}
             items={direction.items}
             unit={unit}
+            targetNominal={direction.targetNominal}
             usl={direction.usl}
             lsl={direction.lsl}
             calculationMode={calculationMode}

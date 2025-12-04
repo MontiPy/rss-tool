@@ -54,6 +54,7 @@ interface ResultsDisplayProps {
   directionId: string;
   items: ToleranceItem[];
   unit: ToleranceUnit;
+  targetNominal?: number; // Target nominal dimension (defaults to 0)
   usl?: number; // Upper Specification Limit
   lsl?: number; // Lower Specification Limit
   calculationMode: CalculationMode;
@@ -67,6 +68,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   directionId,
   items,
   unit,
+  targetNominal = 0,
   usl,
   lsl,
   calculationMode,
@@ -89,7 +91,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   const secondaryUnit = analysisSettings?.secondaryUnit || 'inches';
 
   // Calculate x-axis domain based on user settings
-  const calculateXAxisDomain = (stdDev: number, usl?: number, lsl?: number) => {
+  const calculateXAxisDomain = (stdDev: number, usl?: number, lsl?: number, targetNominal: number = 0) => {
     // Manual mode - use user-specified values
     if (!autoRange && manualMin !== '' && manualMax !== '') {
       const min = parseFloat(manualMin);
@@ -99,10 +101,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
       }
     }
 
-    // Auto mode - use spec-limit formula: max(μ±6σ, LSL-10% / USL+10%)
+    // Auto mode - use spec-limit formula centered on target nominal: targetNominal±6σ, LSL-10% / USL+10%
     const sigmaRange = 6 * stdDev;
-    let min = -sigmaRange;
-    let max = sigmaRange;
+    let min = targetNominal - sigmaRange;
+    let max = targetNominal + sigmaRange;
 
     if (lsl !== undefined) {
       // Extend LSL downward by 10%
@@ -409,10 +411,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               {(() => {
                 // Calculate x-axis domain
                 const tempStdDev = totalPlus / 3;
-                const domain = calculateXAxisDomain(tempStdDev, usl, lsl);
+                const domain = calculateXAxisDomain(tempStdDev, usl, lsl, targetNominal);
 
-                // Generate RSS distribution curve with custom range
-                const rssData = generateRSSDistribution(totalPlus, usl, lsl, 500, domain.min, domain.max);
+                // Generate RSS distribution curve with custom range, centered on target nominal
+                const rssData = generateRSSDistribution(totalPlus, targetNominal, usl, lsl, 500, domain.min, domain.max);
 
                 return (
                   <>

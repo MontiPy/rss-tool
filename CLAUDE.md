@@ -288,7 +288,8 @@ Status Colors (checked independently for USL and LSL):
 
 **Key Features:**
 - **Assumes RSS = ±3σ** (99.7% confidence interval)
-- Generates smooth normal curve with mean μ = 0, standard deviation σ = RSS/3
+- Generates smooth normal curve centered on target nominal (defaults to 0)
+- Mean μ = target nominal, standard deviation σ = RSS/3
 - **Shaded regions:**
   - Green acceptance region between LSL and USL
   - Shows visually how much of the distribution falls within spec
@@ -301,6 +302,7 @@ Status Colors (checked independently for USL and LSL):
 
 **Implementation:**
 - Function: `generateRSSDistribution()` in `rssCalculator.ts`
+- Accepts `targetNominal` parameter to center distribution (defaults to 0)
 - Uses `normalCDF()` for probability calculations
 - Uses `normalPdf()` for curve generation
 - Renders using Recharts `ComposedChart` with Area (shaded regions) + Line (curve)
@@ -630,7 +632,6 @@ export interface DiagramConnector {
 - Green theme (#4caf50 gradient) to distinguish from tolerance items
 - Displays:
   - Target Nominal (if set in DirectionTab)
-  - Variance (calculated nominal sum - target nominal, color-coded: green if ≥0, red if negative)
   - RSS Total (±tolerance result)
 - Two connection handles on left side for incoming edges from tolerance items:
   - left-top handle at 20% from top

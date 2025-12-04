@@ -6,13 +6,9 @@ import { ResultNodeData } from '../types';
 const ResultNode: React.FC<NodeProps<ResultNodeData>> = ({ data }) => {
   const {
     targetNominal,
-    variance,
     rssTotal,
     unit,
   } = data;
-
-  // Variance color: green if positive/zero, red if negative
-  const varianceColor = variance >= 0 ? '#4caf50' : '#d32f2f';
 
   return (
     <Box
@@ -66,13 +62,6 @@ const ResultNode: React.FC<NodeProps<ResultNodeData>> = ({ data }) => {
         {targetNominal !== undefined && (
           <Typography variant="body2" sx={{ mb: 1 }}>
             <strong>Target Nominal:</strong> {targetNominal.toFixed(3)} {unit}
-          </Typography>
-        )}
-
-        {/* Variance (only if target exists) */}
-        {targetNominal !== undefined && (
-          <Typography variant="body2" sx={{ mb: 1, color: varianceColor }}>
-            <strong>Variance:</strong> {variance >= 0 ? '+' : ''}{variance.toFixed(3)} {unit}
           </Typography>
         )}
 

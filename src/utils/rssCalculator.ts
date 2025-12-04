@@ -226,6 +226,7 @@ export function normalPdf(x: number, mean: number, std: number): number {
  * Assumes RSS total represents ±3σ of a normal distribution
  *
  * @param rssTotal - The RSS total tolerance (represents ±3σ)
+ * @param targetNominal - Target nominal dimension (defaults to 0, centers distribution)
  * @param usl - Upper Specification Limit (optional)
  * @param lsl - Lower Specification Limit (optional)
  * @param numPoints - Number of points to generate for the curve (default: 500)
@@ -235,6 +236,7 @@ export function normalPdf(x: number, mean: number, std: number): number {
  */
 export function generateRSSDistribution(
   rssTotal: number,
+  targetNominal: number = 0,
   usl?: number,
   lsl?: number,
   numPoints: number = 500,
@@ -242,7 +244,8 @@ export function generateRSSDistribution(
   customMaxX?: number
 ) {
   // Assume RSS total is 3σ (99.7% confidence interval)
-  const mean = 0;
+  // Center distribution on target nominal
+  const mean = targetNominal;
   const stdDev = rssTotal / 3;
 
   // Calculate the range to display

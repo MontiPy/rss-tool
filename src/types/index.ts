@@ -80,9 +80,8 @@ export interface DiagramConnector {
  * Data for Result Node in diagram
  */
 export interface ResultNodeData {
-  targetNominal?: number;       // User-defined target dimension
+  targetNominal?: number;       // User-defined target dimension (defaults to 0)
   calculatedNominal: number;    // Sum of all item nominals
-  variance: number;             // calculatedNominal - targetNominal
   rssTotal: number;             // Total RSS tolerance (plus direction)
   unit: ToleranceUnit;          // Display unit
   directionId: string;          // Parent direction ID
