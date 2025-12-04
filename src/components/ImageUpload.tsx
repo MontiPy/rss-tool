@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Button, Box, Typography } from '@mui/material';
+import { Button, Box } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
 
 interface ImageUploadProps {
