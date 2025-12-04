@@ -133,6 +133,13 @@ const ToleranceItemNode: React.FC<NodeProps<ToleranceItemNodeData>> = ({ data })
         <Typography variant="body2" sx={{ mb: 0.5 }}>
           <strong>Float:</strong> {isFloating ? '√3' : '1.0'} ({item.floatFactor.toFixed(3)})
         </Typography>
+        {item.imageUrl && (
+          <img
+            src={item.imageUrl}
+            alt="item"
+            style={{ maxWidth: '100%', marginTop: '8px', borderRadius: '4px' }}
+          />
+        )}
       </Box>
 
       {/* Metadata Section (Collapsible) */}

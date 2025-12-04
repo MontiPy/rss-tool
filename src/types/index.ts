@@ -38,6 +38,7 @@ export interface ToleranceItem {
   isFloat?: boolean; // DEPRECATED: Backward compatibility, use floatFactor instead
   notes?: string; // Optional notes or description for this item
   source?: string; // Optional source reference (drawing number, spec, part number)
+  imageUrl?: string; // Optional image URL for this item
   distributionType?: DistributionType; // Distribution for Monte Carlo (used in advanced mode)
 }
 
