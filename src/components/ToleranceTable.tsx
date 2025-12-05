@@ -28,6 +28,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { ToleranceItem, ToleranceMode, CalculationMode } from '../types';
 import { FLOAT_FACTORS } from '../utils/rssCalculator';
 import { MONOSPACE_FONT } from '../App';
+import ImageUpload from './ImageUpload';
 
 interface ToleranceTableProps {
   items: ToleranceItem[];
@@ -117,6 +118,14 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
     );
   };
 
+  const handleImageUpload = (itemId: string, file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      handleItemChange(itemId, 'imageUrl', reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <Box>
       <TableContainer component={Paper} elevation={0} variant="outlined">
@@ -141,6 +150,7 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
               {calculationMode === 'monteCarlo' && useAdvancedDistributions && (
                 <TableCell align="center"><strong>Distribution</strong></TableCell>
               )}
+              <TableCell align="center"><strong>Image</strong></TableCell>
               <TableCell align="center"><strong>Actions</strong></TableCell>
             </TableRow>
           </TableHead>
@@ -232,6 +242,12 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                     </Select>
                   </TableCell>
                 )}
+                <TableCell align="center">
+                  <ImageUpload
+                    onImageUpload={(file) => handleImageUpload(item.id, file)}
+                    imageUrl={item.imageUrl}
+                  />
+                </TableCell>
                 <TableCell align="center">
                   <Tooltip title="Add notes/source">
                     <IconButton
