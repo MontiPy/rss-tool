@@ -285,8 +285,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             {calculationMode === 'monteCarlo'
               ? 'Monte Carlo (±3σ, 99.7% confidence)'
               : calculationMode === 'rss'
-              ? 'RSS (Statistical)'
-              : 'Worst-Case (Arithmetic)'}
+                ? 'RSS (Statistical)'
+                : 'Worst-Case (Arithmetic)'}
           </Typography>
           <Chip
             label={
@@ -470,7 +470,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                     {/* Normal Distribution Curve */}
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                        Normal Distribution (μ = 0, σ = {rssData.stdDev.toFixed(4)} {unit})
+                        Normal Distribution (μ = {rssData.mean.toFixed(3)}, σ = {rssData.stdDev.toFixed(4)} {unit})
                       </Typography>
                       <IconButton
                         size="small"
@@ -569,11 +569,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                             />
                           )}
                           <ReferenceLine
-                            x={0}
+                            x={rssData.mean}
                             stroke="#2ca02c"
                             strokeDasharray="2 2"
                             strokeWidth={1.5}
-                            label={{ value: 'μ', position: 'top', fill: '#2ca02c', fontSize: 11 }}
+                            label={{ value: 'Target', position: 'top', fill: '#2ca02c', fontSize: 11 }}
                           />
                         </ComposedChart>
                       </ResponsiveContainer>
@@ -593,10 +593,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
       {result.monteCarloResult && calculationMode === 'monteCarlo' && (
         <Box sx={{ mt: 2 }}>
 
-              {/* Percentile Summary Table */}
-              <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
-                Distribution Statistics
-              </Typography>
+          {/* Percentile Summary Table */}
+          <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+            Distribution Statistics
+          </Typography>
           <Paper elevation={0} variant="outlined" sx={{ p: 1, mb: 2 }}>
             <Grid container spacing={1}>
               <Grid item xs={6} sm={3}>
@@ -947,10 +947,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                         result.statistical.currentCpk >= 1.66
                           ? 'success'
                           : result.statistical.currentCpk >= 1.33
-                          ? 'success'
-                          : result.statistical.currentCpk >= 1.0
-                          ? 'warning'
-                          : 'error'
+                            ? 'success'
+                            : result.statistical.currentCpk >= 1.0
+                              ? 'warning'
+                              : 'error'
                       }
                       size="small"
                       icon={result.statistical.currentCpk < 1.33 ? <WarningIcon /> : undefined}
@@ -960,10 +960,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                       {result.statistical.currentCpk >= 1.66
                         ? 'Highly capable (≥1.66)'
                         : result.statistical.currentCpk >= 1.33
-                        ? 'Capable (≥1.33)'
-                        : result.statistical.currentCpk >= 1.0
-                        ? 'Marginally capable (≥1.0)'
-                        : 'Incapable (<1.0)'}
+                          ? 'Capable (≥1.33)'
+                          : result.statistical.currentCpk >= 1.0
+                            ? 'Marginally capable (≥1.0)'
+                            : 'Incapable (<1.0)'}
                     </Typography>
                   </Box>
                 </Grid>
@@ -979,8 +979,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                         result.statistical.currentYield >= 99.73
                           ? 'success'
                           : result.statistical.currentYield >= 95
-                          ? 'warning'
-                          : 'error'
+                            ? 'warning'
+                            : 'error'
                       }
                       size="small"
                       sx={{ fontFamily: MONOSPACE_FONT }}

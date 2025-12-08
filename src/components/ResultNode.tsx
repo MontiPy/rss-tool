@@ -7,8 +7,12 @@ const ResultNode: React.FC<NodeProps<ResultNodeData>> = ({ data }) => {
   const {
     targetNominal,
     rssTotal,
+    rssTotalMinus,
     unit,
   } = data;
+
+  // Check if tolerance is symmetric (with small epsilon for float comparison)
+  const isSymmetric = Math.abs(rssTotal - (rssTotalMinus || 0)) < 0.000001;
 
   return (
     <Box
@@ -67,7 +71,9 @@ const ResultNode: React.FC<NodeProps<ResultNodeData>> = ({ data }) => {
 
         {/* RSS Total */}
         <Typography variant="body2">
-          <strong>RSS Total:</strong> ±{rssTotal.toFixed(3)} {unit}
+          <strong>RSS Total:</strong> {isSymmetric
+            ? `±${rssTotal.toFixed(3)}`
+            : `+${rssTotal.toFixed(3)} / -${(rssTotalMinus || 0).toFixed(3)}`} {unit}
         </Typography>
       </Box>
     </Box>

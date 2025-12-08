@@ -107,6 +107,7 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
         targetNominal: direction.targetNominal,
         calculatedNominal,
         rssTotal: rssResult?.totalPlus ?? 0,
+        rssTotalMinus: rssResult?.totalMinus ?? 0,
         unit,
         directionId: direction.id,
         directionName: direction.name,

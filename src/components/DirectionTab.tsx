@@ -113,7 +113,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
     const value = parseFloat(usl);
     onDirectionChange({
       ...direction,
-      usl: isNaN(value) || value === 0 ? undefined : value,
+      usl: isNaN(value) ? undefined : value,
     });
   };
 
@@ -121,7 +121,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
     const value = parseFloat(lsl);
     onDirectionChange({
       ...direction,
-      lsl: isNaN(value) || value === 0 ? undefined : value,
+      lsl: isNaN(value) ? undefined : value,
     });
   };
 
