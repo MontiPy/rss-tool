@@ -23,6 +23,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SettingsIcon from '@mui/icons-material/Settings';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import EditIcon from '@mui/icons-material/Edit';
 import { ProjectData, Direction, ToleranceMode, ProjectMetadata, ToleranceUnit, CalculationMode, AnalysisSettings } from './types';
 import DirectionTab from './components/DirectionTab';
 import FileControls from './components/FileControls';
@@ -274,7 +275,7 @@ function App() {
               scrollButtons="auto"
               sx={{ flexGrow: 1 }}
             >
-              {projectData.directions.map((direction) => (
+              {projectData.directions.map((direction, index) => (
                 <Tab
                   key={direction.id}
                   label={
@@ -308,16 +309,21 @@ function App() {
                           }}
                         />
                       ) : (
-                        <span
+                        <span style={{ cursor: 'pointer' }}>
+                          {direction.name}
+                        </span>
+                      )}
+                      {activeTab === index && editingTabId !== direction.id && (
+                        <IconButton
+                          size="small"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleStartRenaming(direction.id, direction.name);
                           }}
-                          style={{ cursor: 'pointer' }}
-                          title="Click to rename"
+                          title="Rename stack"
                         >
-                          {direction.name}
-                        </span>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
                       )}
                       <IconButton
                         size="small"
