@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+
 import WarningIcon from '@mui/icons-material/Warning';
 import TuneIcon from '@mui/icons-material/Tune';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -220,33 +221,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   const hasLSL = lsl !== undefined;
   const hasLimits = hasUSL || hasLSL;
 
-  let specStatus: 'pass' | 'warning' | 'fail' = 'pass';
-  let uslUtilization = 0;
-  let lslUtilization = 0;
-  let exceedsUSL = false;
-  let exceedsLSL = false;
 
-  if (hasUSL) {
-    const uslMagnitude = Math.abs(usl!);
-    uslUtilization = (totalPlus / uslMagnitude) * 100;
-    exceedsUSL = totalPlus > uslMagnitude;
-    if (uslUtilization > 100) {
-      specStatus = 'fail';
-    } else if (uslUtilization > 90) {
-      specStatus = 'warning';
-    }
-  }
-
-  if (hasLSL) {
-    const lslMagnitude = Math.abs(lsl!);
-    lslUtilization = (totalMinus / lslMagnitude) * 100;
-    exceedsLSL = totalMinus > lslMagnitude;
-    if (lslUtilization > 100) {
-      specStatus = 'fail';
-    } else if (lslUtilization > 90 && specStatus === 'pass') {
-      specStatus = 'warning';
-    }
-  }
 
   // Calculate percentage contributions and sort by size
   // Sum of all contributions (not RSS total) for percentage calculation
@@ -311,50 +286,19 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           </Box>
         )}
 
-        {hasLimits && (
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-              Specification Limits:
+        {/* Cpk 1.33 Result Display */}
+        {result.cpk133TotalPlus !== undefined && result.cpk133TotalPlus < totalPlus && calculationMode === 'rss' && (
+          <Box sx={{ mt: 1, p: 1, border: '1px dashed #1976d2', borderRadius: 1, bgcolor: 'rgba(25, 118, 210, 0.05)' }}>
+            <Typography variant="caption" color="primary" sx={{ display: 'block', fontWeight: 'bold' }}>
+              Potential RSS (Cpk 1.33): ±{formatValue(result.cpk133TotalPlus)}
             </Typography>
-            {hasUSL && (
-              <Box sx={{ mb: 0.5 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  USL: +{usl!.toFixed(4)} {unit}
-                </Typography>
-                <Chip
-                  size="small"
-                  label={`${uslUtilization.toFixed(1)}% of USL`}
-                  color={exceedsUSL ? 'error' : uslUtilization > 90 ? 'warning' : 'success'}
-                  icon={exceedsUSL || uslUtilization > 90 ? <WarningIcon /> : undefined}
-                  sx={{ mr: 0.5 }}
-                />
-                {exceedsUSL && (
-                  <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-                    Exceeds USL by {(totalPlus - usl!).toFixed(4)} {unit}
-                  </Typography>
-                )}
-              </Box>
-            )}
-            {hasLSL && (
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  LSL: {lsl!.toFixed(4)} {unit}
-                </Typography>
-                <Chip
-                  size="small"
-                  label={`${lslUtilization.toFixed(1)}% of LSL`}
-                  color={exceedsLSL ? 'error' : lslUtilization > 90 ? 'warning' : 'success'}
-                  icon={exceedsLSL || lslUtilization > 90 ? <WarningIcon /> : undefined}
-                />
-                {exceedsLSL && (
-                  <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-                    Exceeds LSL by {(totalMinus - Math.abs(lsl!)).toFixed(4)} {unit}
-                  </Typography>
-                )}
-              </Box>
-            )}
+            <Typography variant="caption" color="text.secondary">
+              Improvement: {formatValue(totalPlus - result.cpk133TotalPlus)} ({((totalPlus - result.cpk133TotalPlus) / totalPlus * 100).toFixed(1)}%)
+            </Typography>
           </Box>
         )}
+
+
 
         {/* Sensitivity Analysis Button */}
         {items.length > 1 && (
@@ -416,8 +360,167 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 // Generate RSS distribution curve with custom range, centered on target nominal
                 const rssData = generateRSSDistribution(totalPlus, targetNominal, usl, lsl, 500, domain.min, domain.max);
 
+                // Generate Cpk 1.33 distribution curve if applicable
+                // We use the same domain (min/max X) to ensure alignment
+                // But we generate a new set of points based on the improved sigma
+                let cpk133Data: { x: number; pdf: number }[] | null = null;
+                let mergedData = rssData.curveData; // Initially just standard data
+
+                if (result.cpk133TotalPlus !== undefined && result.cpk133TotalPlus < totalPlus) {
+                  // Calculate simplified generation for the secondary curve using same X points
+                  // The generateRSSDistribution returns data array, we can just map over it or call a helper
+                  // Be efficient: we already have X points in rssData.curveData.
+                  // Just calculating PDF for the second curve at those same X points.
+                  const mean = targetNominal;
+                  const stdDev133 = result.cpk133TotalPlus / 3;
+                  const oneOverSqrt2PiSigma = 1 / (stdDev133 * Math.sqrt(2 * Math.PI));
+                  const twoSigmaSq = 2 * stdDev133 * stdDev133;
+
+                  mergedData = rssData.curveData.map(pt => {
+                    const x = pt.x;
+                    const diff = x - mean;
+                    const pdf133 = oneOverSqrt2PiSigma * Math.exp(-(diff * diff) / twoSigmaSq);
+                    return { ...pt, pdfCpk133: pdf133 };
+                  });
+                }
+
                 return (
                   <>
+
+
+                    {/* Normal Distribution Curve */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+                        Normal Distribution (μ = {rssData.mean.toFixed(3)}, σ = {rssData.stdDev.toFixed(4)} {unit})
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => setChartSettingsOpen(true)}
+                        sx={{ p: 0.5 }}
+                      >
+                        <SettingsIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                    <Paper elevation={0} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <ComposedChart
+                          data={mergedData}
+                          margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+                        >
+                          <defs>
+                            {/* Gradient for acceptance region (green) */}
+                            <linearGradient id="acceptanceRegion" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#4caf50" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#4caf50" stopOpacity={0.1} />
+                            </linearGradient>
+                            {/* Pattern for rejection regions (red hatched) */}
+                            <pattern id="rejectionPattern" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                              <rect width="2" height="8" fill="rgba(211, 47, 47, 0.3)" />
+                            </pattern>
+                          </defs>
+
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                          <XAxis
+                            dataKey="x"
+                            type="number"
+                            domain={[rssData.minX, rssData.maxX]}
+                            ticks={(() => {
+                              const increment = getTickIncrement(rssData.minX, rssData.maxX);
+                              const ticks = [];
+                              const start = Math.ceil(rssData.minX / increment) * increment;
+                              for (let i = start; i <= rssData.maxX; i += increment) {
+                                ticks.push(Number(i.toFixed(10))); // Avoid floating point errors
+                              }
+                              return ticks;
+                            })()}
+                            tickFormatter={(value) => value.toFixed(3)}
+                            label={{ value: `Tolerance (${unit})`, position: 'insideBottom', offset: 0 }}
+                            tick={{ fontSize: 10 }}
+                          />
+                          <YAxis tick={false} />
+                          <RechartsTooltip
+                            formatter={(value: number, name: string) => {
+                              if (name === 'pdfCpk133') return [(value * 100).toFixed(4) + '%', 'Density (Cpk 1.33)'];
+                              return [(value * 100).toFixed(4) + '%', 'Density'];
+                            }}
+                            labelFormatter={(value) => `x = ${Number(value).toFixed(4)}`}
+                          />
+
+                          {/* Shaded acceptance region (between LSL and USL) */}
+                          {hasLimits && (
+                            <Area
+                              type="monotone"
+                              dataKey={(data: any) => {
+                                const x = data.x;
+                                const withinLimits =
+                                  (lsl === undefined || x >= lsl) &&
+                                  (usl === undefined || x <= usl);
+                                return withinLimits ? data.pdf : 0;
+                              }}
+                              fill="url(#acceptanceRegion)"
+                              stroke="none"
+                              isAnimationActive={false}
+                            />
+                          )}
+
+                          {/* Normal distribution curve */}
+                          <Line
+                            type="monotone"
+                            dataKey="pdf"
+                            stroke="#1976d2"
+                            strokeWidth={2}
+                            dot={false}
+                            isAnimationActive={false}
+                            name="Density"
+                          />
+
+                          {/* Cpk 1.33 distribution curve (Dotted) */}
+                          {result.cpk133TotalPlus !== undefined && result.cpk133TotalPlus < totalPlus && (
+                            <Line
+                              type="monotone"
+                              dataKey="pdfCpk133"
+                              stroke="#0d47a1"
+                              strokeDasharray="5 5"
+                              strokeWidth={2}
+                              dot={false}
+                              isAnimationActive={false}
+                              name="Density (Cpk 1.33)"
+                            />
+                          )}
+
+                          {/* Reference lines */}
+                          {hasUSL && (
+                            <ReferenceLine
+                              x={usl}
+                              stroke="#d62728"
+                              strokeDasharray="4 4"
+                              strokeWidth={1.5}
+                              label={{ value: 'USL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
+                            />
+                          )}
+                          {hasLSL && (
+                            <ReferenceLine
+                              x={lsl}
+                              stroke="#d62728"
+                              strokeDasharray="4 4"
+                              strokeWidth={1.5}
+                              label={{ value: 'LSL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
+                            />
+                          )}
+                          <ReferenceLine
+                            x={rssData.mean}
+                            stroke="#2ca02c"
+                            strokeDasharray="2 2"
+                            strokeWidth={1.5}
+                            label={{ value: 'Target', position: 'top', fill: '#2ca02c', fontSize: 11 }}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+                        Solid: Standard RSS (±3σ) • Dashed: Cpk 1.33 Potential (±4σ assumptions)
+                      </Typography>
+                    </Paper>
+
                     {/* Risk Analysis */}
                     {rssData.riskAnalysis && (
                       <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'warning.light' }}>
@@ -466,121 +569,6 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                         </Typography>
                       </Paper>
                     )}
-
-                    {/* Normal Distribution Curve */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                        Normal Distribution (μ = {rssData.mean.toFixed(3)}, σ = {rssData.stdDev.toFixed(4)} {unit})
-                      </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={() => setChartSettingsOpen(true)}
-                        sx={{ p: 0.5 }}
-                      >
-                        <SettingsIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                    <Paper elevation={0} variant="outlined" sx={{ p: 2, mb: 2 }}>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <ComposedChart
-                          data={rssData.curveData}
-                          margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
-                        >
-                          <defs>
-                            {/* Gradient for acceptance region (green) */}
-                            <linearGradient id="acceptanceRegion" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#4caf50" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#4caf50" stopOpacity={0.1} />
-                            </linearGradient>
-                            {/* Pattern for rejection regions (red hatched) */}
-                            <pattern id="rejectionPattern" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                              <rect width="2" height="8" fill="rgba(211, 47, 47, 0.3)" />
-                            </pattern>
-                          </defs>
-
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                          <XAxis
-                            dataKey="x"
-                            type="number"
-                            domain={[rssData.minX, rssData.maxX]}
-                            ticks={(() => {
-                              const increment = getTickIncrement(rssData.minX, rssData.maxX);
-                              const ticks = [];
-                              const start = Math.ceil(rssData.minX / increment) * increment;
-                              for (let i = start; i <= rssData.maxX; i += increment) {
-                                ticks.push(Number(i.toFixed(10))); // Avoid floating point errors
-                              }
-                              return ticks;
-                            })()}
-                            tickFormatter={(value) => value.toFixed(3)}
-                            label={{ value: `Tolerance (${unit})`, position: 'insideBottom', offset: 0 }}
-                            tick={{ fontSize: 10 }}
-                          />
-                          <YAxis tick={false} />
-                          <RechartsTooltip
-                            formatter={(value: number) => [(value * 100).toFixed(4) + '%', 'Density']}
-                            labelFormatter={(value) => `x = ${Number(value).toFixed(4)}`}
-                          />
-
-                          {/* Shaded acceptance region (between LSL and USL) */}
-                          {hasLimits && (
-                            <Area
-                              type="monotone"
-                              dataKey={(data: any) => {
-                                const x = data.x;
-                                const withinLimits =
-                                  (lsl === undefined || x >= lsl) &&
-                                  (usl === undefined || x <= usl);
-                                return withinLimits ? data.pdf : 0;
-                              }}
-                              fill="url(#acceptanceRegion)"
-                              stroke="none"
-                              isAnimationActive={false}
-                            />
-                          )}
-
-                          {/* Normal distribution curve */}
-                          <Line
-                            type="monotone"
-                            dataKey="pdf"
-                            stroke="#1976d2"
-                            strokeWidth={2}
-                            dot={false}
-                            isAnimationActive={false}
-                          />
-
-                          {/* Reference lines */}
-                          {hasUSL && (
-                            <ReferenceLine
-                              x={usl}
-                              stroke="#d62728"
-                              strokeDasharray="4 4"
-                              strokeWidth={1.5}
-                              label={{ value: 'USL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
-                            />
-                          )}
-                          {hasLSL && (
-                            <ReferenceLine
-                              x={lsl}
-                              stroke="#d62728"
-                              strokeDasharray="4 4"
-                              strokeWidth={1.5}
-                              label={{ value: 'LSL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
-                            />
-                          )}
-                          <ReferenceLine
-                            x={rssData.mean}
-                            stroke="#2ca02c"
-                            strokeDasharray="2 2"
-                            strokeWidth={1.5}
-                            label={{ value: 'Target', position: 'top', fill: '#2ca02c', fontSize: 11 }}
-                          />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
-                        Assuming RSS total = ±3σ (99.7% confidence interval)
-                      </Typography>
-                    </Paper>
                   </>
                 );
               })()}

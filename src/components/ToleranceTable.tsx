@@ -147,6 +147,30 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                   <strong>Float (√3)</strong>
                 </TableCell>
               )}
+              <TableCell align="center">
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <strong>Cpk 1.33</strong>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <Typography
+                      variant="caption"
+                      color="primary"
+                      sx={{ cursor: 'pointer', fontSize: '0.65rem', '&:hover': { textDecoration: 'underline' } }}
+                      onClick={() => onItemsChange(items.map(i => ({ ...i, isCpk133: true })))}
+                    >
+                      Set
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">/</Typography>
+                    <Typography
+                      variant="caption"
+                      color="primary"
+                      sx={{ cursor: 'pointer', fontSize: '0.65rem', '&:hover': { textDecoration: 'underline' } }}
+                      onClick={() => onItemsChange(items.map(i => ({ ...i, isCpk133: false })))}
+                    >
+                      Clear
+                    </Typography>
+                  </Box>
+                </Box>
+              </TableCell>
               {calculationMode === 'monteCarlo' && useAdvancedDistributions && (
                 <TableCell align="center"><strong>Distribution</strong></TableCell>
               )}
@@ -228,6 +252,13 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                     </Box>
                   </TableCell>
                 )}
+                <TableCell align="center">
+                  <Checkbox
+                    checked={!!item.isCpk133}
+                    onChange={(e) => handleItemChange(item.id, 'isCpk133', e.target.checked)}
+                    size="small"
+                  />
+                </TableCell>
                 {calculationMode === 'monteCarlo' && useAdvancedDistributions && (
                   <TableCell align="center">
                     <Select

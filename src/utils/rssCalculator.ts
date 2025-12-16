@@ -48,6 +48,8 @@ export function calculateTolerance(
 ): RSSResult {
   let sumOfSquaresPlus = 0;
   let sumOfSquaresMinus = 0;
+  let sumOfSquaresPlus133 = 0; // For Cpk 1.33 secondary result
+  let sumOfSquaresMinus133 = 0; // For Cpk 1.33 secondary result
   let worstCasePlus = 0;
   let worstCaseMinus = 0;
   const itemContributions: RSSResult['itemContributions'] = [];
@@ -60,9 +62,32 @@ export function calculateTolerance(
     const contributionPlus = item.tolerancePlus * floatFactor;
     const contributionMinus = item.toleranceMinus * floatFactor;
 
+    // Calculate Cpk 1.33 contribution (divide by 1.33 if enabled)
+    // If enabled, we assume the input tolerance represents a process capable of 1.33 Cpk
+    // Standard RSS assumes 3 sigma. 1.33 Cpk implies the tolerance limits are at 4 sigma (since Cpk = USL/3sigma -> 1.33 = Tol/3sigma -> Tol = 4sigma approx)
+    // Wait, let's stick to the simple math requested: "demonstrate capability if all values were meeting a 1.33 process capability"
+    // Usually means Effective Sigma = Tolerance / (3 * Cpk).
+    // If we assume input tolerance IS the spec limit.
+    // And we want the 3-sigma variation contributed to the stack.
+    // If Cpk = 1.33, then Spec = 4 * sigma. So sigma = Spec / 4.
+    // Standard RSS usually assumes Spec = 3 * sigma. So sigma = Spec / 3.
+    // So the ratio of new sigma to old sigma is (Spec/4) / (Spec/3) = 3/4 = 0.75.
+    // Or 1 / 1.333...
+    // The prompt says: "treats tolerance as meeting 1.33 Cpk (tolerance/1.33)"
+    // So valid calculation is contribution / 1.33.
+
+    const divisor = item.isCpk133 ? 1.33 : 1.0;
+    const contributionPlus133 = contributionPlus / divisor;
+    const contributionMinus133 = contributionMinus / divisor;
+
     // Add to sums for both calculation modes
     sumOfSquaresPlus += contributionPlus ** 2;
     sumOfSquaresMinus += contributionMinus ** 2;
+
+    // Add to Cpk 1.33 sums
+    sumOfSquaresPlus133 += contributionPlus133 ** 2;
+    sumOfSquaresMinus133 += contributionMinus133 ** 2;
+
     worstCasePlus += contributionPlus;
     worstCaseMinus += contributionMinus;
 
@@ -72,12 +97,18 @@ export function calculateTolerance(
       itemName: item.name,
       contributionPlus,
       contributionMinus,
+      contributionPlus133,
+      contributionMinus133,
     });
   });
 
   // Calculate based on mode
   const totalPlus = mode === 'rss' ? Math.sqrt(sumOfSquaresPlus) : worstCasePlus;
   const totalMinus = mode === 'rss' ? Math.sqrt(sumOfSquaresMinus) : worstCaseMinus;
+
+  // Calculate secondary results (always RSS behavior for this specific feature check)
+  const cpk133TotalPlus = Math.sqrt(sumOfSquaresPlus133);
+  const cpk133TotalMinus = Math.sqrt(sumOfSquaresMinus133);
 
   return {
     directionId,
@@ -87,6 +118,8 @@ export function calculateTolerance(
     worstCasePlus,
     worstCaseMinus,
     itemContributions,
+    cpk133TotalPlus: mode === 'rss' ? cpk133TotalPlus : undefined, // Only relevant for RSS mode meaningful comparison
+    cpk133TotalMinus: mode === 'rss' ? cpk133TotalMinus : undefined,
   };
 }
 

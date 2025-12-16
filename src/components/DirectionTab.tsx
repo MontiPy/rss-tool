@@ -81,9 +81,13 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
 
         // Add statistical analysis if USL exists
         if (direction.usl && direction.usl > 0 && calculationMode === 'rss') {
+          // Calculate the actual tolerance limit (delta) from target
+          const target = direction.targetNominal || 0;
+          const toleranceLimit = Math.abs(direction.usl - target);
+
           const statistical = calculateStatisticalAnalysis(
             result.totalPlus,
-            direction.usl
+            toleranceLimit
           );
           result.statistical = statistical;
         }

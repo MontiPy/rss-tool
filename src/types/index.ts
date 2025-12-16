@@ -40,6 +40,7 @@ export interface ToleranceItem {
   source?: string; // Optional source reference (drawing number, spec, part number)
   imageUrl?: string; // Optional image URL for this item
   distributionType?: DistributionType; // Distribution for Monte Carlo (used in advanced mode)
+  isCpk133?: boolean; // If true, treats tolerance as meeting 1.33 Cpk (tolerance/1.33)
 }
 
 /**
@@ -231,7 +232,11 @@ export interface RSSResult {
     itemName: string;
     contributionPlus: number;
     contributionMinus: number;
+    contributionPlus133?: number; // Contribution with Cpk 1.33 applied
+    contributionMinus133?: number; // Contribution with Cpk 1.33 applied
   }[];
+  cpk133TotalPlus?: number; // Secondary RSS result with Cpk 1.33 assumption
+  cpk133TotalMinus?: number; // Secondary RSS result with Cpk 1.33 assumption
   // Statistical analysis (optional, only shown if targetBudget exists)
   statistical?: {
     current3Sigma: number; // Current 3σ RSS result
