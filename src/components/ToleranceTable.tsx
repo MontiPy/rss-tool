@@ -129,22 +129,22 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
   return (
     <Box>
       <TableContainer component={Paper} elevation={0} variant="outlined">
-        <Table size="small">
+        <Table size="small" sx={{ '& .MuiTableCell-root': { px: 0.5, py: 0.5, fontSize: '0.75rem' } }}>
           <TableHead>
             <TableRow>
-              <TableCell><strong>Item</strong></TableCell>
-              <TableCell align="right"><strong>Nominal</strong></TableCell>
-              <TableCell align="right">
+              <TableCell align="center" sx={{ minWidth: 180 }}><strong>Item</strong></TableCell>
+              <TableCell align="center"><strong>Nominal</strong></TableCell>
+              <TableCell align="center">
                 <strong>
-                  {toleranceMode === 'symmetric' ? 'Tolerance (±)' : 'Tolerance (+)'}
+                  {toleranceMode === 'symmetric' ? 'Tolerance (±)' : <>Tolerance<br />(+)</>}
                 </strong>
               </TableCell>
               {toleranceMode === 'asymmetric' && (
-                <TableCell align="right"><strong>Tolerance (-)</strong></TableCell>
+                <TableCell align="center"><strong>Tolerance<br />(-)</strong></TableCell>
               )}
               {calculationMode !== 'monteCarlo' && (
                 <TableCell align="center">
-                  <strong>Float (√3)</strong>
+                  <strong>Float<br />(√3)</strong>
                 </TableCell>
               )}
               <TableCell align="center">
@@ -187,6 +187,8 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                     onChange={(e) => handleItemChange(item.id, 'name', e.target.value)}
                     size="small"
                     fullWidth
+                    InputProps={{ style: { fontSize: '0.75rem' } }}
+                    inputProps={{ style: { padding: '4px 8px' } }}
                   />
                 </TableCell>
                 <TableCell align="right">
@@ -198,8 +200,8 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                       handleItemChange(item.id, 'nominal', value);
                     }}
                     size="small"
-                    inputProps={{ step: 0.001 }}
-                    sx={{ width: 100, '& input': { fontFamily: MONOSPACE_FONT } }}
+                    inputProps={{ step: 0.001, style: { fontSize: '0.75rem', padding: '4px 8px' } }}
+                    sx={{ width: 80, '& input': { fontFamily: MONOSPACE_FONT } }}
                   />
                 </TableCell>
                 <TableCell align="right">
@@ -214,7 +216,9 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                     inputProps={{ step: 0.01, min: 0 }}
                     error={item.tolerancePlus < 0}
                     helperText={item.tolerancePlus < 0 ? 'Must be ≥ 0' : ''}
-                    sx={{ '& input': { fontFamily: MONOSPACE_FONT } }}
+                    InputProps={{ style: { fontSize: '0.75rem' } }}
+                    inputProps={{ style: { padding: '4px 8px' } }}
+                    sx={{ width: 80, '& input': { fontFamily: MONOSPACE_FONT } }}
                   />
                 </TableCell>
                 {toleranceMode === 'asymmetric' && (
@@ -230,7 +234,9 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                       inputProps={{ step: 0.01, min: 0 }}
                       error={item.toleranceMinus < 0}
                       helperText={item.toleranceMinus < 0 ? 'Must be ≥ 0' : ''}
-                      sx={{ '& input': { fontFamily: MONOSPACE_FONT } }}
+                      InputProps={{ style: { fontSize: '0.75rem' } }}
+                      inputProps={{ style: { padding: '4px 8px' } }}
+                      sx={{ width: 80, '& input': { fontFamily: MONOSPACE_FONT } }}
                     />
                   </TableCell>
                 )}

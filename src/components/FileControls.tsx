@@ -23,16 +23,48 @@ const FileControls: React.FC<FileControlsProps> = ({ projectData, onLoad }) => {
     severity: 'success',
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `rss-calculation-${timestamp}.json`;
-      exportToJSON(projectData, filename);
-      setSnackbar({
-        open: true,
-        message: 'Project saved successfully!',
-        severity: 'success',
-      });
+      const defaultName = `rss-calculation-${timestamp}.json`;
+
+      // Check for File System Access API support (modern "Save As")
+      if ('showSaveFilePicker' in window) {
+        try {
+          // @ts-ignore - Experimental API
+          const handle = await window.showSaveFilePicker({
+            suggestedName: defaultName,
+            types: [{
+              description: 'JSON File',
+              accept: { 'application/json': ['.json'] },
+            }],
+          });
+
+          // @ts-ignore
+          const writable = await handle.createWritable();
+          await writable.write(JSON.stringify(projectData, null, 2));
+          await writable.close();
+
+          setSnackbar({
+            open: true,
+            message: 'Project saved successfully!',
+            severity: 'success',
+          });
+        } catch (err) {
+          // Verify if user cancelled
+          if ((err as Error).name !== 'AbortError') {
+            throw err;
+          }
+        }
+      } else {
+        // Fallback to legacy download method
+        exportToJSON(projectData, defaultName);
+        setSnackbar({
+          open: true,
+          message: 'Project saved successfully!',
+          severity: 'success',
+        });
+      }
     } catch (error) {
       setSnackbar({
         open: true,

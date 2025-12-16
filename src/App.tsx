@@ -389,7 +389,7 @@ function App() {
           {/* Footer */}
           <Box sx={{ mt: 2, textAlign: 'center' }}>
             <Typography variant="caption" color="text.secondary">
-              RSS Tolerance Stack Calculator - Root Sum Square with Float Factor (√3) Support
+              RSS Tolerance Stack Calculator
             </Typography>
           </Box>
         </Container>
