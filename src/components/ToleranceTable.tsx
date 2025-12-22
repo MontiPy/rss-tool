@@ -25,6 +25,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import NotesIcon from '@mui/icons-material/Notes';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { ToleranceItem, ToleranceMode, CalculationMode } from '../types';
 import { FLOAT_FACTORS } from '../utils/rssCalculator';
 import { MONOSPACE_FONT } from '../App';
@@ -116,6 +118,19 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
         return item;
       })
     );
+  };
+
+  const handleMoveItem = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === items.length - 1) return;
+
+    const newItems = [...items];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+
+    // Swap items
+    [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
+
+    onItemsChange(newItems);
   };
 
   const handleImageUpload = (itemId: string, file: File) => {
@@ -213,11 +228,10 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                       handleItemChange(item.id, 'tolerancePlus', Math.max(0, value));
                     }}
                     size="small"
-                    inputProps={{ step: 0.01, min: 0 }}
+                    inputProps={{ step: 0.01, min: 0, style: { padding: '4px 8px' } }}
                     error={item.tolerancePlus < 0}
                     helperText={item.tolerancePlus < 0 ? 'Must be ≥ 0' : ''}
                     InputProps={{ style: { fontSize: '0.75rem' } }}
-                    inputProps={{ style: { padding: '4px 8px' } }}
                     sx={{ width: 80, '& input': { fontFamily: MONOSPACE_FONT } }}
                   />
                 </TableCell>
@@ -231,11 +245,10 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                         handleItemChange(item.id, 'toleranceMinus', Math.max(0, value));
                       }}
                       size="small"
-                      inputProps={{ step: 0.01, min: 0 }}
+                      inputProps={{ step: 0.01, min: 0, style: { padding: '4px 8px' } }}
                       error={item.toleranceMinus < 0}
                       helperText={item.toleranceMinus < 0 ? 'Must be ≥ 0' : ''}
                       InputProps={{ style: { fontSize: '0.75rem' } }}
-                      inputProps={{ style: { padding: '4px 8px' } }}
                       sx={{ width: 80, '& input': { fontFamily: MONOSPACE_FONT } }}
                     />
                   </TableCell>
@@ -286,31 +299,51 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                   />
                 </TableCell>
                 <TableCell align="center">
-                  <Tooltip title="Add notes/source">
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', mr: 1 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleMoveItem(items.indexOf(item), 'up')}
+                        disabled={items.indexOf(item) === 0}
+                        sx={{ p: 0.25 }}
+                      >
+                        <ArrowUpwardIcon fontSize="inherit" sx={{ fontSize: '1rem' }} />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleMoveItem(items.indexOf(item), 'down')}
+                        disabled={items.indexOf(item) === items.length - 1}
+                        sx={{ p: 0.25 }}
+                      >
+                        <ArrowDownwardIcon fontSize="inherit" sx={{ fontSize: '1rem' }} />
+                      </IconButton>
+                    </Box>
+                    <Tooltip title="Add notes/source">
+                      <IconButton
+                        onClick={() => handleOpenNotes(item)}
+                        size="small"
+                        color={item.notes || item.source ? 'primary' : 'default'}
+                      >
+                        <NotesIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Duplicate item">
+                      <IconButton
+                        onClick={() => handleDuplicateItem(item.id)}
+                        size="small"
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <IconButton
-                      onClick={() => handleOpenNotes(item)}
+                      onClick={() => handleDeleteItem(item.id)}
+                      color="error"
                       size="small"
-                      color={item.notes || item.source ? 'primary' : 'default'}
+                      title="Delete item"
                     >
-                      <NotesIcon fontSize="small" />
+                      <DeleteIcon fontSize="small" />
                     </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Duplicate item">
-                    <IconButton
-                      onClick={() => handleDuplicateItem(item.id)}
-                      size="small"
-                    >
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <IconButton
-                    onClick={() => handleDeleteItem(item.id)}
-                    color="error"
-                    size="small"
-                    title="Delete item"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}

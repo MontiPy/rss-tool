@@ -227,7 +227,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
         </Button>
       </Box>
       <Grid container spacing={2}>
-        <Grid item xs={12} lg={7}>
+        <Grid item xs={12} md sx={{ minWidth: 0 }}>
           <ToleranceTable
             items={direction.items}
             toleranceMode={toleranceMode}
@@ -236,7 +236,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
             useAdvancedDistributions={analysisSettings?.monteCarloSettings?.useAdvancedDistributions}
           />
         </Grid>
-        <Grid item xs={12} lg={5}>
+        <Grid item xs={12} md="auto" sx={{ width: { md: 450 } }}>
           <ResultsDisplay
             result={rssResult}
             directionName={direction.name}

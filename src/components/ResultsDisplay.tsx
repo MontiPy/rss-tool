@@ -363,7 +363,6 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 // Generate Cpk 1.33 distribution curve if applicable
                 // We use the same domain (min/max X) to ensure alignment
                 // But we generate a new set of points based on the improved sigma
-                let cpk133Data: { x: number; pdf: number }[] | null = null;
                 let mergedData = rssData.curveData; // Initially just standard data
 
                 if (result.cpk133TotalPlus !== undefined && result.cpk133TotalPlus < totalPlus) {
