@@ -18,7 +18,16 @@ import {
   MarkerType,
   NodeChange,
 } from 'reactflow';
-import { Direction, ToleranceMode, ToleranceUnit, DiagramData, DiagramNode, DiagramConnector, RSSResult, ResultNodeData } from '../types';
+import {
+  Direction,
+  ToleranceMode,
+  ToleranceUnit,
+  DiagramData,
+  DiagramNode,
+  DiagramConnector,
+  RSSResult,
+  ResultNodeData,
+} from '../types';
 import DiagramCanvas from './DiagramCanvas';
 import { ToleranceItemNodeData } from './ToleranceItemNode';
 
@@ -45,31 +54,15 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Initialize nodes and edges from direction data
-  useEffect(() => {
-    if (open && direction) {
-      initializeDiagram();
-    }
-  }, [open, direction.id]); // Only reinitialize when dialog opens or direction changes
-
-  // Track changes to positions/edges
-  useEffect(() => {
-    if (open && nodes.length > 0) {
-      setHasChanges(true);
-    }
-  }, [nodes, edges]);
-
   // Initialize diagram: convert Direction.items to React Flow nodes
-  const initializeDiagram = () => {
+  const initializeDiagram = useCallback(() => {
     const existingDiagram = direction.diagram;
     const newNodes: Node<ToleranceItemNodeData | ResultNodeData>[] = [];
 
     direction.items.forEach((item, index) => {
       // Find existing position from saved diagram
-      const existingNode = existingDiagram?.nodes.find(n => n.id === item.id);
-      const position = existingNode
-        ? existingNode.position
-        : { x: 100, y: 100 + index * 150 }; // Auto-position: vertical stack with 150px spacing
+      const existingNode = existingDiagram?.nodes.find((n) => n.id === item.id);
+      const position = existingNode ? existingNode.position : { x: 100, y: 100 + index * 150 }; // Auto-position: vertical stack with 150px spacing
 
       newNodes.push({
         id: item.id,
@@ -92,12 +85,8 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
 
     // Position: right side of tolerance items
     // Calculate rightmost x position + offset
-    const maxX = newNodes.length > 0
-      ? Math.max(...newNodes.map(n => n.position.x))
-      : 100;
-    const resultPosition = existingResultNode
-      ? existingResultNode
-      : { x: maxX + 400, y: 100 };  // 400px to the right, align with top
+    const maxX = newNodes.length > 0 ? Math.max(...newNodes.map((n) => n.position.x)) : 100;
+    const resultPosition = existingResultNode ? existingResultNode : { x: maxX + 400, y: 100 }; // 400px to the right, align with top
 
     const resultNode: Node<ResultNodeData> = {
       id: resultNodeId,
@@ -114,43 +103,58 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
       },
       // Make result node non-deletable
       deletable: false,
-      draggable: true,  // Allow repositioning
+      draggable: true, // Allow repositioning
     };
 
     newNodes.push(resultNode);
 
     // Convert saved connectors to React Flow edges
-    const newEdges: Edge[] = existingDiagram?.connectors.map(connector => {
-      // Check if target is a result node (arrows only to result node)
-      const isTargetResultNode = connector.targetNodeId.startsWith('result-');
+    const newEdges: Edge[] =
+      existingDiagram?.connectors.map((connector) => {
+        // Check if target is a result node (arrows only to result node)
+        const isTargetResultNode = connector.targetNodeId.startsWith('result-');
 
-      return {
-        id: connector.id,
-        source: connector.sourceNodeId,
-        target: connector.targetNodeId,
-        sourceHandle: connector.sourceHandleId ?? null,
-        targetHandle: connector.targetHandleId ?? null,
-        label: connector.label,
-        animated: connector.animated || false,
-        type: 'smoothstep',  // Preserve edge type on reload
-        style: {
-          stroke: connector.style?.strokeColor || '#888',
-          strokeWidth: connector.style?.strokeWidth || 2,
-        },
-        // Only add arrow marker if target is result node
-        ...(isTargetResultNode && {
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: connector.style?.strokeColor || '#888',
+        return {
+          id: connector.id,
+          source: connector.sourceNodeId,
+          target: connector.targetNodeId,
+          sourceHandle: connector.sourceHandleId ?? null,
+          targetHandle: connector.targetHandleId ?? null,
+          label: connector.label,
+          animated: connector.animated || false,
+          type: 'smoothstep', // Preserve edge type on reload
+          style: {
+            stroke: connector.style?.strokeColor || '#888',
+            strokeWidth: connector.style?.strokeWidth || 2,
           },
-        }),
-      };
-    }) || [];
+          // Only add arrow marker if target is result node
+          ...(isTargetResultNode && {
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: connector.style?.strokeColor || '#888',
+            },
+          }),
+        };
+      }) || [];
 
     setNodes(newNodes);
     setEdges(newEdges);
     setHasChanges(false);
-  };
+  }, [direction, toleranceMode, unit, rssResult, setNodes, setEdges]);
+
+  // Initialize nodes and edges from direction data
+  useEffect(() => {
+    if (open && direction) {
+      initializeDiagram();
+    }
+  }, [open, direction.id, initializeDiagram]); // Only reinitialize when dialog opens or direction changes
+
+  // Track changes to positions/edges
+  useEffect(() => {
+    if (open && nodes.length > 0) {
+      setHasChanges(true);
+    }
+  }, [nodes, edges]);
 
   // Handle new connection between nodes
   const onConnect = useCallback((connection: Connection) => {
@@ -179,37 +183,40 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
     };
     setEdges((eds) => addEdge(newEdge, eds));
     setHasChanges(true);
-  }, []);
+  }, [setEdges]);
 
   // Custom nodes change handler that protects result node from deletion
-  const handleNodesChange = useCallback((changes: NodeChange[]) => {
-    // Filter out deletion attempts on result node
-    const filteredChanges = changes.filter(change => {
-      if (change.type === 'remove') {
-        const node = nodes.find(n => n.id === change.id);
-        return node?.type !== 'result';  // Prevent result node deletion
-      }
-      return true;
-    });
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      // Filter out deletion attempts on result node
+      const filteredChanges = changes.filter((change) => {
+        if (change.type === 'remove') {
+          const node = nodes.find((n) => n.id === change.id);
+          return node?.type !== 'result'; // Prevent result node deletion
+        }
+        return true;
+      });
 
-    onNodesChange(filteredChanges);
-  }, [nodes, onNodesChange]);
+      onNodesChange(filteredChanges);
+    },
+    [nodes, onNodesChange]
+  );
 
   // Convert React Flow state back to DiagramData
   const convertToDiagramData = (): DiagramData => {
     // Find result node and filter it out from regular nodes
-    const resultNode = nodes.find(n => n.type === 'result');
+    const resultNode = nodes.find((n) => n.type === 'result');
 
     const diagramNodes: DiagramNode[] = nodes
-      .filter(node => node.type !== 'result')  // Exclude result node
-      .map(node => ({
+      .filter((node) => node.type !== 'result') // Exclude result node
+      .map((node) => ({
         id: node.id,
         position: node.position,
         width: node.width ?? undefined,
         height: node.height ?? undefined,
       }));
 
-    const connectors: DiagramConnector[] = edges.map(edge => ({
+    const connectors: DiagramConnector[] = edges.map((edge) => ({
       id: edge.id || `${edge.source}-${edge.target}`,
       sourceNodeId: edge.source,
       targetNodeId: edge.target,
@@ -218,15 +225,15 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
       label: edge.label as string | undefined,
       animated: edge.animated,
       style: {
-        strokeColor: (edge.style as any)?.stroke,
-        strokeWidth: (edge.style as any)?.strokeWidth,
+        strokeColor: (edge.style as { stroke?: string })?.stroke,
+        strokeWidth: (edge.style as { strokeWidth?: number })?.strokeWidth,
       },
     }));
 
     return {
       nodes: diagramNodes,
       connectors,
-      resultNodePosition: resultNode ? resultNode.position : undefined,  // Save result node position separately
+      resultNodePosition: resultNode ? resultNode.position : undefined, // Save result node position separately
     };
   };
 
@@ -245,9 +252,7 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
   // Handle cancel button click
   const handleCancel = () => {
     if (hasChanges) {
-      const confirmed = window.confirm(
-        'You have unsaved changes. Do you want to discard them?'
-      );
+      const confirmed = window.confirm('You have unsaved changes. Do you want to discard them?');
       if (!confirmed) return;
     }
     onClose();
@@ -269,9 +274,7 @@ const DiagramBuilderDialog: React.FC<DiagramBuilderDialogProps> = ({
       <DialogTitle>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h6">
-              Stack Diagram: {direction.name}
-            </Typography>
+            <Typography variant="h6">Stack Diagram: {direction.name}</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
               Click connectors to select, press Delete/Backspace to remove
             </Typography>

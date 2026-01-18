@@ -133,13 +133,27 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
         headerRow.forEach((header, index) => {
           const normalized = header.toLowerCase().trim();
 
-          if (normalized.includes('name') || normalized.includes('item') || normalized.includes('description')) {
+          if (
+            normalized.includes('name') ||
+            normalized.includes('item') ||
+            normalized.includes('description')
+          ) {
             autoMapping.name = index.toString();
           } else if (normalized.includes('nominal') || normalized === 'nom') {
             autoMapping.nominal = index.toString();
-          } else if (normalized.includes('tolerance') && (normalized.includes('+') || normalized.includes('plus') || normalized.includes('positive'))) {
+          } else if (
+            normalized.includes('tolerance') &&
+            (normalized.includes('+') ||
+              normalized.includes('plus') ||
+              normalized.includes('positive'))
+          ) {
             autoMapping.tolerancePlus = index.toString();
-          } else if (normalized.includes('tolerance') && (normalized.includes('-') || normalized.includes('minus') || normalized.includes('negative'))) {
+          } else if (
+            normalized.includes('tolerance') &&
+            (normalized.includes('-') ||
+              normalized.includes('minus') ||
+              normalized.includes('negative'))
+          ) {
             autoMapping.toleranceMinus = index.toString();
           } else if (normalized.includes('tolerance') && !autoMapping.tolerancePlus) {
             // If just "tolerance", use for plus (and minus in symmetric mode)
@@ -151,7 +165,11 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
             autoMapping.floatFactor = index.toString();
           } else if (normalized.includes('note')) {
             autoMapping.notes = index.toString();
-          } else if (normalized.includes('source') || normalized.includes('reference') || normalized.includes('dwg')) {
+          } else if (
+            normalized.includes('source') ||
+            normalized.includes('reference') ||
+            normalized.includes('dwg')
+          ) {
             autoMapping.source = index.toString();
           }
         });
@@ -205,7 +223,9 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
         const nameIndex = parseInt(columnMapping.name);
         const nominalIndex = columnMapping.nominal ? parseInt(columnMapping.nominal) : -1;
         const plusIndex = parseInt(columnMapping.tolerancePlus);
-        const minusIndex = columnMapping.toleranceMinus ? parseInt(columnMapping.toleranceMinus) : plusIndex;
+        const minusIndex = columnMapping.toleranceMinus
+          ? parseInt(columnMapping.toleranceMinus)
+          : plusIndex;
         const floatIndex = columnMapping.floatFactor ? parseInt(columnMapping.floatFactor) : -1;
         const notesIndex = columnMapping.notes ? parseInt(columnMapping.notes) : -1;
         const sourceIndex = columnMapping.source ? parseInt(columnMapping.source) : -1;
@@ -219,7 +239,12 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
         let floatFactor: number = FLOAT_FACTORS.FIXED;
         if (floatIndex >= 0 && row[floatIndex]) {
           const floatValue = row[floatIndex].toLowerCase().trim();
-          if (floatValue === 'true' || floatValue === '1' || floatValue === 'yes' || floatValue.includes('√3')) {
+          if (
+            floatValue === 'true' ||
+            floatValue === '1' ||
+            floatValue === 'yes' ||
+            floatValue.includes('√3')
+          ) {
             floatFactor = FLOAT_FACTORS.SQRT3;
           } else if (!isNaN(parseFloat(floatValue))) {
             floatFactor = parseFloat(floatValue);
@@ -227,7 +252,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
         }
 
         // Parse nominal value
-        const nominal = nominalIndex >= 0 ? (parseFloat(row[nominalIndex]) || 0) : 0;
+        const nominal = nominalIndex >= 0 ? parseFloat(row[nominalIndex]) || 0 : 0;
 
         return {
           id: `item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
@@ -281,10 +306,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
     <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
       <DialogTitle>
         Import Tolerance Items from CSV
-        <IconButton
-          onClick={handleClose}
-          sx={{ position: 'absolute', right: 8, top: 8 }}
-        >
+        <IconButton onClick={handleClose} sx={{ position: 'absolute', right: 8, top: 8 }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -320,12 +342,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
               size="large"
             >
               Choose CSV File
-              <input
-                type="file"
-                hidden
-                accept=".csv"
-                onChange={handleFileUpload}
-              />
+              <input type="file" hidden accept=".csv" onChange={handleFileUpload} />
             </Button>
             {csvData.length > 0 && (
               <Typography variant="body2" sx={{ mt: 2, color: 'success.main' }}>
@@ -339,7 +356,8 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
         {activeStep === 1 && (
           <Box>
             <Typography variant="body2" gutterBottom>
-              Map CSV columns to tolerance item fields. Detected headers are auto-mapped when possible.
+              Map CSV columns to tolerance item fields. Detected headers are auto-mapped when
+              possible.
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
@@ -507,21 +525,34 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
         {activeStep === 2 && (
           <Box>
             <Alert severity="info" sx={{ mb: 2 }}>
-              Preview of {previewItems.length} items to be imported. Click "Import" to add these items to the current tolerance stack.
+              Preview of {previewItems.length} items to be imported. Click "Import" to add these
+              items to the current tolerance stack.
             </Alert>
 
             <TableContainer component={Paper} variant="outlined">
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell><strong>Item Name</strong></TableCell>
-                    <TableCell align="right"><strong>Tolerance (+)</strong></TableCell>
+                    <TableCell>
+                      <strong>Item Name</strong>
+                    </TableCell>
+                    <TableCell align="right">
+                      <strong>Tolerance (+)</strong>
+                    </TableCell>
                     {!isSymmetricMode && (
-                      <TableCell align="right"><strong>Tolerance (-)</strong></TableCell>
+                      <TableCell align="right">
+                        <strong>Tolerance (-)</strong>
+                      </TableCell>
                     )}
-                    <TableCell align="center"><strong>Float</strong></TableCell>
-                    <TableCell><strong>Source</strong></TableCell>
-                    <TableCell><strong>Notes</strong></TableCell>
+                    <TableCell align="center">
+                      <strong>Float</strong>
+                    </TableCell>
+                    <TableCell>
+                      <strong>Source</strong>
+                    </TableCell>
+                    <TableCell>
+                      <strong>Notes</strong>
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -556,9 +587,7 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
 
       <DialogActions>
         <Button onClick={handleClose}>Cancel</Button>
-        {activeStep > 0 && (
-          <Button onClick={handleBack}>Back</Button>
-        )}
+        {activeStep > 0 && <Button onClick={handleBack}>Back</Button>}
         {activeStep === 1 && (
           <Button onClick={generatePreview} variant="contained">
             Preview

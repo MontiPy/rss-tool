@@ -2,7 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Box, Grid, TextField, Button } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import { Direction, ToleranceMode, ToleranceUnit, RSSResult, CalculationMode, AnalysisSettings, ToleranceItem } from '../types';
+import {
+  Direction,
+  ToleranceMode,
+  ToleranceUnit,
+  RSSResult,
+  CalculationMode,
+  AnalysisSettings,
+  ToleranceItem,
+} from '../types';
 import ToleranceTable from './ToleranceTable';
 import ResultsDisplay from './ResultsDisplay';
 import CSVImportDialog from './CSVImportDialog';
@@ -64,7 +72,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
             directionName: direction.name,
             totalPlus: threeSigma,
             totalMinus: threeSigma,
-            itemContributions: mcResult.itemContributions.map(ic => ({
+            itemContributions: mcResult.itemContributions.map((ic) => ({
               itemId: ic.itemId,
               itemName: ic.itemName,
               contributionPlus: ic.mean,
@@ -77,14 +85,16 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
         }, 50); // Small delay to let UI update
       } else {
         // RSS or Worst-Case mode (existing code)
-        const result = calculateTolerance(direction.items, direction.id, direction.name, calculationMode);
+        const result = calculateTolerance(
+          direction.items,
+          direction.id,
+          direction.name,
+          calculationMode
+        );
 
         // Add statistical analysis if USL exists
         if (direction.usl && direction.usl > 0 && calculationMode === 'rss') {
-          const statistical = calculateStatisticalAnalysis(
-            result.totalPlus,
-            direction.usl
-          );
+          const statistical = calculateStatisticalAnalysis(result.totalPlus, direction.usl);
           result.statistical = statistical;
         }
 
@@ -229,7 +239,9 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
             toleranceMode={toleranceMode}
             onItemsChange={handleItemsChange}
             calculationMode={calculationMode}
-            useAdvancedDistributions={analysisSettings?.monteCarloSettings?.useAdvancedDistributions}
+            useAdvancedDistributions={
+              analysisSettings?.monteCarloSettings?.useAdvancedDistributions
+            }
           />
         </Grid>
         <Grid item xs={12} md={5}>

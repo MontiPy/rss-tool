@@ -54,9 +54,9 @@ export interface DiagramPosition {
  * Node in diagram representing a tolerance item
  */
 export interface DiagramNode {
-  id: string;              // Matches ToleranceItem.id (1:1 relationship)
+  id: string; // Matches ToleranceItem.id (1:1 relationship)
   position: DiagramPosition;
-  width?: number;          // Optional size overrides
+  width?: number; // Optional size overrides
   height?: number;
 }
 
@@ -64,13 +64,13 @@ export interface DiagramNode {
  * Connector between two nodes in diagram
  */
 export interface DiagramConnector {
-  id: string;                    // Unique connector ID
-  sourceNodeId: string;          // Source node ID
-  targetNodeId: string;          // Target node ID
-  sourceHandleId?: string;       // Source handle ID (top/bottom/left/right)
-  targetHandleId?: string;       // Target handle ID (top/bottom/left/right)
-  label?: string;                // User-defined label (generic meaning)
-  animated?: boolean;            // Animated flow effect
+  id: string; // Unique connector ID
+  sourceNodeId: string; // Source node ID
+  targetNodeId: string; // Target node ID
+  sourceHandleId?: string; // Source handle ID (top/bottom/left/right)
+  targetHandleId?: string; // Target handle ID (top/bottom/left/right)
+  label?: string; // User-defined label (generic meaning)
+  animated?: boolean; // Animated flow effect
   style?: {
     strokeColor?: string;
     strokeWidth?: number;
@@ -81,23 +81,24 @@ export interface DiagramConnector {
  * Data for Result Node in diagram
  */
 export interface ResultNodeData {
-  targetNominal?: number;       // User-defined target dimension (defaults to 0)
-  calculatedNominal: number;    // Sum of all item nominals
-  rssTotal: number;             // Total RSS tolerance (plus direction)
-  rssTotalMinus: number;        // Total RSS tolerance (minus direction)
-  unit: ToleranceUnit;          // Display unit
-  directionId: string;          // Parent direction ID
-  directionName: string;        // Parent direction name
+  targetNominal?: number; // User-defined target dimension (defaults to 0)
+  calculatedNominal: number; // Sum of all item nominals
+  rssTotal: number; // Total RSS tolerance (plus direction)
+  rssTotalMinus: number; // Total RSS tolerance (minus direction)
+  unit: ToleranceUnit; // Display unit
+  directionId: string; // Parent direction ID
+  directionName: string; // Parent direction name
 }
 
 /**
  * Complete diagram data for a direction
  */
 export interface DiagramData {
-  nodes: DiagramNode[];          // Node positions (tolerance items only)
-  connectors: DiagramConnector[];// Connections
-  resultNodePosition?: DiagramPosition;  // Result node position (optional, stored separately)
-  viewport?: {                   // Saved zoom/pan state
+  nodes: DiagramNode[]; // Node positions (tolerance items only)
+  connectors: DiagramConnector[]; // Connections
+  resultNodePosition?: DiagramPosition; // Result node position (optional, stored separately)
+  viewport?: {
+    // Saved zoom/pan state
     x: number;
     y: number;
     zoom: number;

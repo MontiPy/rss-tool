@@ -31,7 +31,13 @@ import WarningIcon from '@mui/icons-material/Warning';
 import TuneIcon from '@mui/icons-material/Tune';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { RSSResult, ToleranceUnit, CalculationMode, AnalysisSettings, ToleranceItem } from '../types';
+import {
+  RSSResult,
+  ToleranceUnit,
+  CalculationMode,
+  AnalysisSettings,
+  ToleranceItem,
+} from '../types';
 import { formatWithMultiUnit, generateRSSDistribution } from '../utils/rssCalculator';
 import SensitivityAnalysisDialog from './SensitivityAnalysisDialog';
 import { MONOSPACE_FONT } from '../App';
@@ -91,7 +97,12 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   const secondaryUnit = analysisSettings?.secondaryUnit || 'inches';
 
   // Calculate x-axis domain based on user settings
-  const calculateXAxisDomain = (stdDev: number, usl?: number, lsl?: number, targetNominal: number = 0) => {
+  const calculateXAxisDomain = (
+    stdDev: number,
+    usl?: number,
+    lsl?: number,
+    targetNominal: number = 0
+  ) => {
     // Manual mode - use user-specified values
     if (!autoRange && manualMin !== '' && manualMax !== '') {
       const min = parseFloat(manualMin);
@@ -184,7 +195,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             Running Monte Carlo simulation...
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            ({analysisSettings?.monteCarloSettings?.iterations?.toLocaleString() || '50,000'} iterations)
+            ({analysisSettings?.monteCarloSettings?.iterations?.toLocaleString() || '50,000'}{' '}
+            iterations)
           </Typography>
         </Box>
       </Paper>
@@ -251,17 +263,28 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   // Calculate percentage contributions and sort by size
   // Sum of all contributions (not RSS total) for percentage calculation
   const sumOfContributionsPlus = itemContributions.reduce((sum, c) => sum + c.contributionPlus, 0);
-  const sumOfContributionsMinus = itemContributions.reduce((sum, c) => sum + c.contributionMinus, 0);
+  const sumOfContributionsMinus = itemContributions.reduce(
+    (sum, c) => sum + c.contributionMinus,
+    0
+  );
 
-  const contributionsWithPercent = itemContributions.map((contribution) => {
-    const percentPlus = sumOfContributionsPlus > 0 ? (contribution.contributionPlus / sumOfContributionsPlus) * 100 : 0;
-    const percentMinus = sumOfContributionsMinus > 0 ? (contribution.contributionMinus / sumOfContributionsMinus) * 100 : 0;
-    return {
-      ...contribution,
-      percentPlus,
-      percentMinus,
-    };
-  }).sort((a, b) => b.percentPlus - a.percentPlus); // Sort by largest contribution first
+  const contributionsWithPercent = itemContributions
+    .map((contribution) => {
+      const percentPlus =
+        sumOfContributionsPlus > 0
+          ? (contribution.contributionPlus / sumOfContributionsPlus) * 100
+          : 0;
+      const percentMinus =
+        sumOfContributionsMinus > 0
+          ? (contribution.contributionMinus / sumOfContributionsMinus) * 100
+          : 0;
+      return {
+        ...contribution,
+        percentPlus,
+        percentMinus,
+      };
+    })
+    .sort((a, b) => b.percentPlus - a.percentPlus); // Sort by largest contribution first
 
   // Find the maximum percentage for scaling the bars
   const maxPercent = Math.max(...contributionsWithPercent.map((c) => c.percentPlus));
@@ -300,16 +323,19 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         </Box>
 
         {/* Show comparison if we have both values calculated */}
-        {worstCasePlus !== undefined && worstCaseMinus !== undefined && calculationMode === 'rss' && (
-          <Box sx={{ mt: 1, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              Worst-Case: ±{formatValue(worstCasePlus)}
-            </Typography>
-            <Typography variant="caption" color="success.main" sx={{ fontWeight: 'bold' }}>
-              RSS saves: {formatValue(worstCasePlus - totalPlus)} ({((worstCasePlus - totalPlus) / worstCasePlus * 100).toFixed(1)}%)
-            </Typography>
-          </Box>
-        )}
+        {worstCasePlus !== undefined &&
+          worstCaseMinus !== undefined &&
+          calculationMode === 'rss' && (
+            <Box sx={{ mt: 1, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                Worst-Case: ±{formatValue(worstCasePlus)}
+              </Typography>
+              <Typography variant="caption" color="success.main" sx={{ fontWeight: 'bold' }}>
+                RSS saves: {formatValue(worstCasePlus - totalPlus)} (
+                {(((worstCasePlus - totalPlus) / worstCasePlus) * 100).toFixed(1)}%)
+              </Typography>
+            </Box>
+          )}
 
         {hasLimits && (
           <Box sx={{ mt: 1 }}>
@@ -404,7 +430,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
           <Collapse in={showDistribution}>
             <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontStyle: 'italic' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mb: 1, fontStyle: 'italic' }}
+              >
                 Theoretical normal distribution (RSS = ±3σ)
               </Typography>
 
@@ -414,14 +444,29 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 const domain = calculateXAxisDomain(tempStdDev, usl, lsl, targetNominal);
 
                 // Generate RSS distribution curve with custom range, centered on target nominal
-                const rssData = generateRSSDistribution(totalPlus, targetNominal, usl, lsl, 500, domain.min, domain.max);
+                const rssData = generateRSSDistribution(
+                  totalPlus,
+                  targetNominal,
+                  usl,
+                  lsl,
+                  500,
+                  domain.min,
+                  domain.max
+                );
 
                 return (
                   <>
                     {/* Risk Analysis */}
                     {rssData.riskAnalysis && (
-                      <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'warning.light' }}>
-                        <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+                      <Paper
+                        elevation={0}
+                        variant="outlined"
+                        sx={{ p: 1.5, mb: 2, bgcolor: 'warning.light' }}
+                      >
+                        <Typography
+                          variant="caption"
+                          sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}
+                        >
                           Risk Analysis (Theoretical)
                         </Typography>
                         {rssData.riskAnalysis.usl !== undefined && (
@@ -429,12 +474,14 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                             <Chip
                               size="small"
                               label={`${(rssData.riskAnalysis.probabilityExceedingUSL * 100).toFixed(2)}%`}
-                              color={rssData.riskAnalysis.probabilityExceedingUSL > 0.05 ? 'error' : 'success'}
+                              color={
+                                rssData.riskAnalysis.probabilityExceedingUSL > 0.05
+                                  ? 'error'
+                                  : 'success'
+                              }
                               sx={{ fontFamily: MONOSPACE_FONT }}
                             />
-                            <Typography variant="caption">
-                              probability of exceeding USL
-                            </Typography>
+                            <Typography variant="caption">probability of exceeding USL</Typography>
                           </Box>
                         )}
                         {rssData.riskAnalysis.lsl !== undefined && (
@@ -442,35 +489,46 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                             <Chip
                               size="small"
                               label={`${(rssData.riskAnalysis.probabilityExceedingLSL * 100).toFixed(2)}%`}
-                              color={rssData.riskAnalysis.probabilityExceedingLSL > 0.05 ? 'error' : 'success'}
+                              color={
+                                rssData.riskAnalysis.probabilityExceedingLSL > 0.05
+                                  ? 'error'
+                                  : 'success'
+                              }
                               sx={{ fontFamily: MONOSPACE_FONT }}
                             />
-                            <Typography variant="caption">
-                              probability of exceeding LSL
-                            </Typography>
+                            <Typography variant="caption">probability of exceeding LSL</Typography>
                           </Box>
                         )}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                           <Chip
                             size="small"
                             label={`${(rssData.riskAnalysis.probabilityOutOfSpec * 100).toFixed(2)}%`}
-                            color={rssData.riskAnalysis.probabilityOutOfSpec > 0.05 ? 'error' : 'success'}
+                            color={
+                              rssData.riskAnalysis.probabilityOutOfSpec > 0.05 ? 'error' : 'success'
+                            }
                             sx={{ fontFamily: MONOSPACE_FONT }}
                           />
-                          <Typography variant="caption">
-                            total probability out of spec
-                          </Typography>
+                          <Typography variant="caption">total probability out of spec</Typography>
                         </Box>
                         <Typography variant="caption" color="text.secondary">
-                          Expected defect rate: {rssData.riskAnalysis.expectedDefectRate.toFixed(0)} PPM
+                          Expected defect rate: {rssData.riskAnalysis.expectedDefectRate.toFixed(0)}{' '}
+                          PPM
                         </Typography>
                       </Paper>
                     )}
 
                     {/* Normal Distribution Curve */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        mb: 1,
+                      }}
+                    >
                       <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                        Normal Distribution (μ = {rssData.mean.toFixed(3)}, σ = {rssData.stdDev.toFixed(4)} {unit})
+                        Normal Distribution (μ = {rssData.mean.toFixed(3)}, σ ={' '}
+                        {rssData.stdDev.toFixed(4)} {unit})
                       </Typography>
                       <IconButton
                         size="small"
@@ -493,7 +551,13 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                               <stop offset="95%" stopColor="#4caf50" stopOpacity={0.1} />
                             </linearGradient>
                             {/* Pattern for rejection regions (red hatched) */}
-                            <pattern id="rejectionPattern" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                            <pattern
+                              id="rejectionPattern"
+                              width="8"
+                              height="8"
+                              patternUnits="userSpaceOnUse"
+                              patternTransform="rotate(45)"
+                            >
                               <rect width="2" height="8" fill="rgba(211, 47, 47, 0.3)" />
                             </pattern>
                           </defs>
@@ -513,12 +577,19 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                               return ticks;
                             })()}
                             tickFormatter={(value) => value.toFixed(3)}
-                            label={{ value: `Tolerance (${unit})`, position: 'insideBottom', offset: 0 }}
+                            label={{
+                              value: `Tolerance (${unit})`,
+                              position: 'insideBottom',
+                              offset: 0,
+                            }}
                             tick={{ fontSize: 10 }}
                           />
                           <YAxis tick={false} />
                           <RechartsTooltip
-                            formatter={(value: number) => [(value * 100).toFixed(4) + '%', 'Density']}
+                            formatter={(value: number) => [
+                              (value * 100).toFixed(4) + '%',
+                              'Density',
+                            ]}
                             labelFormatter={(value) => `x = ${Number(value).toFixed(4)}`}
                           />
 
@@ -526,7 +597,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                           {hasLimits && (
                             <Area
                               type="monotone"
-                              dataKey={(data: any) => {
+                              dataKey={(data: { x: number; pdf: number }) => {
                                 const x = data.x;
                                 const withinLimits =
                                   (lsl === undefined || x >= lsl) &&
@@ -556,7 +627,13 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                               stroke="#d62728"
                               strokeDasharray="4 4"
                               strokeWidth={1.5}
-                              label={{ value: 'USL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
+                              label={{
+                                value: 'USL',
+                                position: 'top',
+                                fill: '#d62728',
+                                fontSize: 11,
+                                fontWeight: 'bold',
+                              }}
                             />
                           )}
                           {hasLSL && (
@@ -565,7 +642,13 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                               stroke="#d62728"
                               strokeDasharray="4 4"
                               strokeWidth={1.5}
-                              label={{ value: 'LSL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
+                              label={{
+                                value: 'LSL',
+                                position: 'top',
+                                fill: '#d62728',
+                                fontSize: 11,
+                                fontWeight: 'bold',
+                              }}
                             />
                           )}
                           <ReferenceLine
@@ -573,11 +656,20 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                             stroke="#2ca02c"
                             strokeDasharray="2 2"
                             strokeWidth={1.5}
-                            label={{ value: 'Target', position: 'top', fill: '#2ca02c', fontSize: 11 }}
+                            label={{
+                              value: 'Target',
+                              position: 'top',
+                              fill: '#2ca02c',
+                              fontSize: 11,
+                            }}
                           />
                         </ComposedChart>
                       </ResponsiveContainer>
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mt: 1, display: 'block', textAlign: 'center' }}
+                      >
                         Assuming RSS total = ±3σ (99.7% confidence interval)
                       </Typography>
                     </Paper>
@@ -592,7 +684,6 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
       {/* Monte Carlo Results */}
       {result.monteCarloResult && calculationMode === 'monteCarlo' && (
         <Box sx={{ mt: 2 }}>
-
           {/* Percentile Summary Table */}
           <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
             Distribution Statistics
@@ -600,37 +691,49 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           <Paper elevation={0} variant="outlined" sx={{ p: 1, mb: 2 }}>
             <Grid container spacing={1}>
               <Grid item xs={6} sm={3}>
-                <Typography variant="caption" color="text.secondary">5th Percentile</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  5th Percentile
+                </Typography>
                 <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
                   {formatValue(result.monteCarloResult.percentiles.p5)}
                 </Typography>
               </Grid>
               <Grid item xs={6} sm={3}>
-                <Typography variant="caption" color="text.secondary">Median (50th)</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Median (50th)
+                </Typography>
                 <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
                   {formatValue(result.monteCarloResult.percentiles.p50)}
                 </Typography>
               </Grid>
               <Grid item xs={6} sm={3}>
-                <Typography variant="caption" color="text.secondary">95th Percentile</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  95th Percentile
+                </Typography>
                 <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT, fontWeight: 'bold' }}>
                   {formatValue(result.monteCarloResult.percentiles.p95)}
                 </Typography>
               </Grid>
               <Grid item xs={6} sm={3}>
-                <Typography variant="caption" color="text.secondary">99th Percentile</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  99th Percentile
+                </Typography>
                 <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
                   {formatValue(result.monteCarloResult.percentiles.p99)}
                 </Typography>
               </Grid>
               <Grid item xs={6}>
-                <Typography variant="caption" color="text.secondary">Mean</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Mean
+                </Typography>
                 <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
                   {formatValue(result.monteCarloResult.percentiles.mean)}
                 </Typography>
               </Grid>
               <Grid item xs={6}>
-                <Typography variant="caption" color="text.secondary">Std Deviation</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Std Deviation
+                </Typography>
                 <Typography variant="body2" sx={{ fontFamily: MONOSPACE_FONT }}>
                   {formatValue(result.monteCarloResult.percentiles.stdDev)}
                 </Typography>
@@ -640,7 +743,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
           {/* Risk Analysis (if limits exist) */}
           {result.monteCarloResult.riskAnalysis && (
-            <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'warning.light' }}>
+            <Paper
+              elevation={0}
+              variant="outlined"
+              sx={{ p: 1.5, mb: 2, bgcolor: 'warning.light' }}
+            >
               <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
                 Risk Analysis
               </Typography>
@@ -649,12 +756,14 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                   <Chip
                     size="small"
                     label={`${(result.monteCarloResult.riskAnalysis.probabilityExceedingUSL * 100).toFixed(2)}%`}
-                    color={result.monteCarloResult.riskAnalysis.probabilityExceedingUSL > 0.05 ? 'error' : 'success'}
+                    color={
+                      result.monteCarloResult.riskAnalysis.probabilityExceedingUSL > 0.05
+                        ? 'error'
+                        : 'success'
+                    }
                     sx={{ fontFamily: MONOSPACE_FONT }}
                   />
-                  <Typography variant="caption">
-                    probability of exceeding USL
-                  </Typography>
+                  <Typography variant="caption">probability of exceeding USL</Typography>
                 </Box>
               )}
               {result.monteCarloResult.riskAnalysis.lsl !== undefined && (
@@ -662,75 +771,86 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                   <Chip
                     size="small"
                     label={`${(result.monteCarloResult.riskAnalysis.probabilityExceedingLSL * 100).toFixed(2)}%`}
-                    color={result.monteCarloResult.riskAnalysis.probabilityExceedingLSL > 0.05 ? 'error' : 'success'}
+                    color={
+                      result.monteCarloResult.riskAnalysis.probabilityExceedingLSL > 0.05
+                        ? 'error'
+                        : 'success'
+                    }
                     sx={{ fontFamily: MONOSPACE_FONT }}
                   />
-                  <Typography variant="caption">
-                    probability of exceeding LSL
-                  </Typography>
+                  <Typography variant="caption">probability of exceeding LSL</Typography>
                 </Box>
               )}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <Chip
                   size="small"
                   label={`${(result.monteCarloResult.riskAnalysis.probabilityOutOfSpec * 100).toFixed(2)}%`}
-                  color={result.monteCarloResult.riskAnalysis.probabilityOutOfSpec > 0.05 ? 'error' : 'success'}
+                  color={
+                    result.monteCarloResult.riskAnalysis.probabilityOutOfSpec > 0.05
+                      ? 'error'
+                      : 'success'
+                  }
                   sx={{ fontFamily: MONOSPACE_FONT }}
                 />
-                <Typography variant="caption">
-                  total probability out of spec
-                </Typography>
+                <Typography variant="caption">total probability out of spec</Typography>
               </Box>
               <Typography variant="caption" color="text.secondary">
-                Expected defect rate: {result.monteCarloResult.riskAnalysis.expectedDefectRate.toFixed(0)} PPM
+                Expected defect rate:{' '}
+                {result.monteCarloResult.riskAnalysis.expectedDefectRate.toFixed(0)} PPM
               </Typography>
             </Paper>
           )}
 
           {/* Final Stack Histogram */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}
+          >
             <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
               Final Tolerance Stack Distribution
             </Typography>
-            <IconButton
-              size="small"
-              onClick={() => setChartSettingsOpen(true)}
-              sx={{ p: 0.5 }}
-            >
+            <IconButton size="small" onClick={() => setChartSettingsOpen(true)} sx={{ p: 0.5 }}>
               <SettingsIcon fontSize="small" />
             </IconButton>
           </Box>
           <Paper elevation={0} variant="outlined" sx={{ p: 2, mb: 2 }}>
             <ResponsiveContainer width="100%" height={300}>
-              <ComposedChart data={(() => {
-                // Calculate viewport domain based on user settings
-                const std = result.monteCarloResult.percentiles.stdDev;
-                const viewportDomain = calculateXAxisDomain(std, usl, lsl);
+              <ComposedChart
+                data={(() => {
+                  // Calculate viewport domain based on user settings
+                  const std = result.monteCarloResult.percentiles.stdDev;
+                  const viewportDomain = calculateXAxisDomain(std, usl, lsl);
 
-                // Generate histogram bins (filtered to viewport) - show actual distribution shape
-                const histogramData = result.monteCarloResult.histogram
-                  .filter(bin => bin.binCenter >= viewportDomain.min && bin.binCenter <= viewportDomain.max)
-                  .map(bin => ({
-                    x: bin.binCenter,
-                    frequency: bin.frequency,
-                    count: bin.count,
-                  }));
+                  // Generate histogram bins (filtered to viewport) - show actual distribution shape
+                  const histogramData = result.monteCarloResult.histogram
+                    .filter(
+                      (bin) =>
+                        bin.binCenter >= viewportDomain.min && bin.binCenter <= viewportDomain.max
+                    )
+                    .map((bin) => ({
+                      x: bin.binCenter,
+                      frequency: bin.frequency,
+                      count: bin.count,
+                    }));
 
-                return histogramData;
-              })()}>
+                  return histogramData;
+                })()}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis
                   dataKey="x"
                   type="number"
-                  domain={[(() => {
-                    const std = result.monteCarloResult.percentiles.stdDev;
-                    const domain = calculateXAxisDomain(std, usl, lsl);
-                    return domain.min;
-                  })(), (() => {
-                    const std = result.monteCarloResult.percentiles.stdDev;
-                    const domain = calculateXAxisDomain(std, usl, lsl);
-                    return domain.max;
-                  })()]}
+                  domain={[
+                    (() => {
+                      const std = result.monteCarloResult.percentiles.stdDev;
+                      const domain = calculateXAxisDomain(std, usl, lsl);
+                      return domain.min;
+                    })(),
+                    (() => {
+                      const std = result.monteCarloResult.percentiles.stdDev;
+                      const domain = calculateXAxisDomain(std, usl, lsl);
+                      return domain.max;
+                    })(),
+                  ]}
                   ticks={(() => {
                     const std = result.monteCarloResult.percentiles.stdDev;
                     const domain = calculateXAxisDomain(std, usl, lsl);
@@ -771,7 +891,13 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                     stroke="#d62728"
                     strokeDasharray="4 4"
                     strokeWidth={1.5}
-                    label={{ value: 'USL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
+                    label={{
+                      value: 'USL',
+                      position: 'top',
+                      fill: '#d62728',
+                      fontSize: 11,
+                      fontWeight: 'bold',
+                    }}
                   />
                 )}
                 {hasLSL && (
@@ -780,7 +906,13 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                     stroke="#d62728"
                     strokeDasharray="4 4"
                     strokeWidth={1.5}
-                    label={{ value: 'LSL', position: 'top', fill: '#d62728', fontSize: 11, fontWeight: 'bold' }}
+                    label={{
+                      value: 'LSL',
+                      position: 'top',
+                      fill: '#d62728',
+                      fontSize: 11,
+                      fontWeight: 'bold',
+                    }}
                   />
                 )}
                 <ReferenceLine
@@ -792,7 +924,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 />
               </ComposedChart>
             </ResponsiveContainer>
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 1, display: 'block', textAlign: 'center' }}
+            >
               {result.monteCarloResult.iterations.toLocaleString()} simulation iterations
             </Typography>
           </Paper>
@@ -829,36 +965,45 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
               <Collapse in={showItemHistograms}>
                 <Box sx={{ mt: 1 }}>
-                  {items.map(item => {
+                  {items.map((item) => {
                     const itemHistogram = result.monteCarloResult!.itemHistograms.get(item.id);
                     if (!itemHistogram) return null;
 
                     // Find item's contribution data (has mean and stdDev)
-                    const itemContrib = result.monteCarloResult!.itemContributions.find(ic => ic.itemId === item.id);
+                    const itemContrib = result.monteCarloResult!.itemContributions.find(
+                      (ic) => ic.itemId === item.id
+                    );
                     if (!itemContrib) return null;
 
                     return (
                       <Paper key={item.id} elevation={0} variant="outlined" sx={{ p: 2, mb: 1 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 'bold', mb: 1, display: 'block' }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ fontWeight: 'bold', mb: 1, display: 'block' }}
+                        >
                           {item.name}
                         </Typography>
                         <ResponsiveContainer width="100%" height={200}>
-                          <ComposedChart data={(() => {
-                            // Show actual distribution shape without curve assumption
-                            const histData = itemHistogram.map(bin => ({
-                              x: bin.binCenter,
-                              frequency: bin.frequency,
-                              count: bin.count,
-                            }));
-                            return histData;
-                          })()}>
+                          <ComposedChart
+                            data={(() => {
+                              // Show actual distribution shape without curve assumption
+                              const histData = itemHistogram.map((bin) => ({
+                                x: bin.binCenter,
+                                frequency: bin.frequency,
+                                count: bin.count,
+                              }));
+                              return histData;
+                            })()}
+                          >
                             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                             <XAxis
                               dataKey="x"
                               type="number"
                               domain={['dataMin', 'dataMax']}
                               ticks={(() => {
-                                const itemHistogram = result.monteCarloResult!.itemHistograms.get(item.id);
+                                const itemHistogram = result.monteCarloResult!.itemHistograms.get(
+                                  item.id
+                                );
                                 if (!itemHistogram) return undefined;
                                 const minX = Math.min(...itemHistogram.map((b) => b.binStart));
                                 const maxX = Math.max(...itemHistogram.map((b) => b.binEnd));
@@ -876,7 +1021,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                             <YAxis tick={false} />
                             <RechartsTooltip
                               formatter={(value: number, name: string) => {
-                                if (name === 'frequency') return [(value * 100).toFixed(2) + '%', 'Frequency'];
+                                if (name === 'frequency')
+                                  return [(value * 100).toFixed(2) + '%', 'Frequency'];
                                 return [value, name];
                               }}
                               labelFormatter={(value) => `x = ${Number(value).toFixed(4)}`}
@@ -928,16 +1074,29 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             <Box sx={{ mt: 1, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
               <Grid container spacing={2}>
                 <Grid item xs={12}>
-                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ display: 'block' }}
+                  >
                     Current 3σ RSS
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}
+                  >
                     ±{formatValue(result.statistical.current3Sigma)}
                   </Typography>
                 </Grid>
 
                 <Grid item xs={12}>
-                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ display: 'block' }}
+                  >
                     Current Process Capability (Cpk)
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -969,7 +1128,12 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 </Grid>
 
                 <Grid item xs={12}>
-                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ display: 'block' }}
+                  >
                     Estimated Yield
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -993,25 +1157,44 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
                 <Grid item xs={12}>
                   <Divider sx={{ my: 1 }} />
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}
+                  >
                     Capability Targets
                   </Typography>
                 </Grid>
 
                 <Grid item xs={12}>
-                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ display: 'block' }}
+                  >
                     Required 3σ for Cpk = 1.33 (Capable Process)
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}
+                  >
                     ±{formatValue(result.statistical.required3SigmaFor1_33Cpk)}
                   </Typography>
                 </Grid>
 
                 <Grid item xs={12}>
-                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ display: 'block' }}
+                  >
                     Required 3σ for Cpk = 1.66 (Highly Capable Process)
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 'bold', fontFamily: MONOSPACE_FONT }}
+                  >
                     ±{formatValue(result.statistical.required3SigmaFor1_66Cpk)}
                   </Typography>
                 </Grid>
@@ -1038,7 +1221,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               '&:hover': { bgcolor: 'action.hover' },
               borderRadius: 1,
               px: 1,
-              py: 0.5
+              py: 0.5,
             }}
             onClick={() => setShowContributions(!showContributions)}
           >
@@ -1061,15 +1244,23 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell><strong>Item</strong></TableCell>
+                    <TableCell>
+                      <strong>Item</strong>
+                    </TableCell>
                     <TableCell align="right">
                       <strong>{isSymmetric ? 'Value' : 'Value (+)'}</strong>
                     </TableCell>
                     {!isSymmetric && (
-                      <TableCell align="right"><strong>Value (-)</strong></TableCell>
+                      <TableCell align="right">
+                        <strong>Value (-)</strong>
+                      </TableCell>
                     )}
-                    <TableCell align="right"><strong>% of Total</strong></TableCell>
-                    <TableCell sx={{ width: '30%' }}><strong>Impact</strong></TableCell>
+                    <TableCell align="right">
+                      <strong>% of Total</strong>
+                    </TableCell>
+                    <TableCell sx={{ width: '30%' }}>
+                      <strong>Impact</strong>
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1097,7 +1288,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                           </TableCell>
                         )}
                         <TableCell align="right" sx={{ py: 0.5 }}>
-                          <Typography variant="body2" sx={{ fontWeight: isHighImpact ? 'bold' : 'normal' }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: isHighImpact ? 'bold' : 'normal' }}
+                          >
                             {contribution.percentPlus.toFixed(1)}%
                           </Typography>
                         </TableCell>
@@ -1158,7 +1352,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         <DialogContent>
           {/* Viewport Range Section */}
           <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Box
+              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
+            >
               <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                 Viewport Range
               </Typography>
@@ -1223,7 +1419,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
           {/* Tick Increment Section */}
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Box
+              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
+            >
               <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                 X-Axis Tick Increment
               </Typography>
@@ -1249,7 +1447,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               type="number"
               inputProps={{ step: 0.01, min: 0.01 }}
               placeholder={autoTicks ? 'Auto' : 'e.g., 0.1, 0.25, 0.5, 1.0'}
-              helperText={autoTicks ? 'Auto selects from: 0.1, 0.25, 0.5, 1.0, 2.5, 5.0...' : 'Custom increment value'}
+              helperText={
+                autoTicks
+                  ? 'Auto selects from: 0.1, 0.25, 0.5, 1.0, 2.5, 5.0...'
+                  : 'Custom increment value'
+              }
             />
           </Box>
         </DialogContent>

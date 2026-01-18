@@ -31,10 +31,7 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         RSS Tolerance Stack Calculator - Help
-        <IconButton
-          onClick={onClose}
-          sx={{ position: 'absolute', right: 8, top: 8 }}
-        >
+        <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -49,16 +46,19 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
             <AccordionDetails>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Typography variant="body2">
-                  RSS is a statistical method for calculating tolerance stack-up that assumes tolerances
-                  are normally distributed and independent. It provides a more realistic estimate than
-                  worst-case analysis.
+                  RSS is a statistical method for calculating tolerance stack-up that assumes
+                  tolerances are normally distributed and independent. It provides a more realistic
+                  estimate than worst-case analysis.
                 </Typography>
 
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
                     Formula:
                   </Typography>
-                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'action.hover', fontFamily: 'monospace' }}>
+                  <Paper
+                    variant="outlined"
+                    sx={{ p: 2, bgcolor: 'action.hover', fontFamily: 'monospace' }}
+                  >
                     RSS = √(Σ((tolerance × float_factor)²))
                   </Paper>
                 </Box>
@@ -74,19 +74,13 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                       </Typography>
                     </li>
                     <li>
-                      <Typography variant="body2">
-                        Square each result
-                      </Typography>
+                      <Typography variant="body2">Square each result</Typography>
                     </li>
                     <li>
-                      <Typography variant="body2">
-                        Sum all the squared values
-                      </Typography>
+                      <Typography variant="body2">Sum all the squared values</Typography>
                     </li>
                     <li>
-                      <Typography variant="body2">
-                        Take the square root of the sum
-                      </Typography>
+                      <Typography variant="body2">Take the square root of the sum</Typography>
                     </li>
                   </ol>
                 </Box>
@@ -99,11 +93,21 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                     <Table size="small">
                       <TableBody>
                         <TableRow>
-                          <TableCell><strong>Item</strong></TableCell>
-                          <TableCell><strong>Tolerance</strong></TableCell>
-                          <TableCell><strong>Float Factor</strong></TableCell>
-                          <TableCell><strong>Contribution</strong></TableCell>
-                          <TableCell><strong>Squared</strong></TableCell>
+                          <TableCell>
+                            <strong>Item</strong>
+                          </TableCell>
+                          <TableCell>
+                            <strong>Tolerance</strong>
+                          </TableCell>
+                          <TableCell>
+                            <strong>Float Factor</strong>
+                          </TableCell>
+                          <TableCell>
+                            <strong>Contribution</strong>
+                          </TableCell>
+                          <TableCell>
+                            <strong>Squared</strong>
+                          </TableCell>
                         </TableRow>
                         <TableRow>
                           <TableCell>Item 1</TableCell>
@@ -127,12 +131,20 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                           <TableCell>0.16</TableCell>
                         </TableRow>
                         <TableRow sx={{ bgcolor: 'action.hover' }}>
-                          <TableCell colSpan={4}><strong>Sum of squares</strong></TableCell>
-                          <TableCell><strong>0.680</strong></TableCell>
+                          <TableCell colSpan={4}>
+                            <strong>Sum of squares</strong>
+                          </TableCell>
+                          <TableCell>
+                            <strong>0.680</strong>
+                          </TableCell>
                         </TableRow>
                         <TableRow sx={{ bgcolor: 'primary.light' }}>
-                          <TableCell colSpan={4}><strong>RSS = √(0.680)</strong></TableCell>
-                          <TableCell><strong>0.825 mm</strong></TableCell>
+                          <TableCell colSpan={4}>
+                            <strong>RSS = √(0.680)</strong>
+                          </TableCell>
+                          <TableCell>
+                            <strong>0.825 mm</strong>
+                          </TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -158,13 +170,17 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                   <Typography variant="subtitle2" gutterBottom>
                     Formula:
                   </Typography>
-                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'action.hover', fontFamily: 'monospace' }}>
+                  <Paper
+                    variant="outlined"
+                    sx={{ p: 2, bgcolor: 'action.hover', fontFamily: 'monospace' }}
+                  >
                     Worst-Case = Σ(tolerance × float_factor)
                   </Paper>
                 </Box>
 
                 <Typography variant="body2">
-                  Using the same example above, worst-case = 0.5 + 0.520 + 0.4 = <strong>1.420 mm</strong>
+                  Using the same example above, worst-case = 0.5 + 0.520 + 0.4 ={' '}
+                  <strong>1.420 mm</strong>
                 </Typography>
 
                 <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
@@ -182,7 +198,8 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
             <AccordionDetails>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Typography variant="body2">
-                  Monte Carlo simulation provides probabilistic tolerance analysis by running thousands of random samples.
+                  Monte Carlo simulation provides probabilistic tolerance analysis by running
+                  thousands of random samples.
                 </Typography>
 
                 <Box>
@@ -191,7 +208,10 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                   </Typography>
                   <Box component="ul" sx={{ pl: 2, mt: 0 }}>
                     <li>Each tolerance item is sampled from a probability distribution</li>
-                    <li>Deviations add algebraically (linear sum) for each sample (default: 50,000 iterations)</li>
+                    <li>
+                      Deviations add algebraically (linear sum) for each sample (default: 50,000
+                      iterations)
+                    </li>
                     <li>Results aggregated into bilateral histogram and percentile statistics</li>
                   </Box>
                 </Box>
@@ -201,9 +221,17 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                     Distribution Types:
                   </Typography>
                   <Box component="ul" sx={{ pl: 2, mt: 0 }}>
-                    <li><strong>Normal:</strong> Used for controlled manufacturing processes (default for fixed items)</li>
-                    <li><strong>Uniform:</strong> Equal probability across tolerance range (default for floating items)</li>
-                    <li><strong>Triangular:</strong> Most likely at center, decreasing toward limits</li>
+                    <li>
+                      <strong>Normal:</strong> Used for controlled manufacturing processes (default
+                      for fixed items)
+                    </li>
+                    <li>
+                      <strong>Uniform:</strong> Equal probability across tolerance range (default
+                      for floating items)
+                    </li>
+                    <li>
+                      <strong>Triangular:</strong> Most likely at center, decreasing toward limits
+                    </li>
                   </Box>
                 </Box>
 
@@ -212,14 +240,30 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                     Reading Results:
                   </Typography>
                   <Box component="ul" sx={{ pl: 2, mt: 0 }}>
-                    <li><strong>±3σ Range:</strong> Captures 99.7% of all assemblies (shown in main result)</li>
-                    <li><strong>Median (50th):</strong> Typical assembly deviation (should be near zero)</li>
-                    <li><strong>Bilateral Histogram:</strong> Shows both positive and negative deviations</li>
-                    <li><strong>Risk Analysis:</strong> Probability of exceeding ±budget limits (LSL/USL)</li>
+                    <li>
+                      <strong>±3σ Range:</strong> Captures 99.7% of all assemblies (shown in main
+                      result)
+                    </li>
+                    <li>
+                      <strong>Median (50th):</strong> Typical assembly deviation (should be near
+                      zero)
+                    </li>
+                    <li>
+                      <strong>Bilateral Histogram:</strong> Shows both positive and negative
+                      deviations
+                    </li>
+                    <li>
+                      <strong>Risk Analysis:</strong> Probability of exceeding ±budget limits
+                      (LSL/USL)
+                    </li>
                   </Box>
                 </Box>
 
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: 'block', mt: 1 }}
+                >
                   Note: Assumes tolerances are ±3σ values (industry standard)
                 </Typography>
               </Box>
@@ -242,9 +286,15 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                   <Table size="small">
                     <TableBody>
                       <TableRow>
-                        <TableCell><strong>Float Factor</strong></TableCell>
-                        <TableCell><strong>Value</strong></TableCell>
-                        <TableCell><strong>When to Use</strong></TableCell>
+                        <TableCell>
+                          <strong>Float Factor</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Value</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>When to Use</strong>
+                        </TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell>Fixed (1.0)</TableCell>
@@ -255,8 +305,8 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                         <TableCell>√3 Float</TableCell>
                         <TableCell>≈ 1.732</TableCell>
                         <TableCell>
-                          Floating tolerances (clearance holes, adjustable features).
-                          Assumes uniform distribution instead of normal distribution.
+                          Floating tolerances (clearance holes, adjustable features). Assumes
+                          uniform distribution instead of normal distribution.
                         </TableCell>
                       </TableRow>
                     </TableBody>
@@ -264,8 +314,9 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                 </TableContainer>
 
                 <Typography variant="body2">
-                  <strong>Example:</strong> A clearance hole with ±0.5 mm tolerance that can be adjusted
-                  during assembly would use the √3 factor, contributing 0.866 mm instead of 0.5 mm to the RSS calculation.
+                  <strong>Example:</strong> A clearance hole with ±0.5 mm tolerance that can be
+                  adjusted during assembly would use the √3 factor, contributing 0.866 mm instead of
+                  0.5 mm to the RSS calculation.
                 </Typography>
               </Box>
             </AccordionDetails>
@@ -295,7 +346,8 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                     </li>
                     <li>
                       <Typography variant="body2">
-                        For the item being analyzed, temporarily add one increment (default 0.1 mm) to its tolerance
+                        For the item being analyzed, temporarily add one increment (default 0.1 mm)
+                        to its tolerance
                       </Typography>
                     </li>
                     <li>
@@ -316,24 +368,30 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                     Example:
                   </Typography>
                   <Typography variant="body2">
-                    Original RSS total: 2.236 mm<br />
-                    Item 1 tolerance: 1.0 mm<br />
+                    Original RSS total: 2.236 mm
+                    <br />
+                    Item 1 tolerance: 1.0 mm
+                    <br />
                     Increment: 0.1 mm
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 1 }}>
-                    1. Change Item 1 tolerance to 1.1 mm (1.0 + 0.1)<br />
-                    2. Recalculate RSS: 2.250 mm<br />
+                    1. Change Item 1 tolerance to 1.1 mm (1.0 + 0.1)
+                    <br />
+                    2. Recalculate RSS: 2.250 mm
+                    <br />
                     3. Sensitivity = 2.250 - 2.236 = <strong>0.014 mm</strong>
                   </Typography>
                 </Box>
 
                 <Box sx={{ bgcolor: 'info.light', p: 2, borderRadius: 1 }}>
                   <Typography variant="body2">
-                    <strong>Interpretation:</strong> "A 0.100 mm change in this tolerance causes a 0.014 mm change in total RSS"
+                    <strong>Interpretation:</strong> "A 0.100 mm change in this tolerance causes a
+                    0.014 mm change in total RSS"
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 1 }}>
-                    • <strong>High sensitivity</strong> → Tighten this tolerance to reduce RSS<br />
-                    • <strong>Low sensitivity</strong> → Loosening this tolerance has minimal impact
+                    • <strong>High sensitivity</strong> → Tighten this tolerance to reduce RSS
+                    <br />• <strong>Low sensitivity</strong> → Loosening this tolerance has minimal
+                    impact
                   </Typography>
                 </Box>
               </Box>
@@ -355,9 +413,15 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                   <Table size="small">
                     <TableBody>
                       <TableRow>
-                        <TableCell><strong>Status</strong></TableCell>
-                        <TableCell><strong>Condition</strong></TableCell>
-                        <TableCell><strong>Color</strong></TableCell>
+                        <TableCell>
+                          <strong>Status</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Condition</strong>
+                        </TableCell>
+                        <TableCell>
+                          <strong>Color</strong>
+                        </TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell>Pass</TableCell>
@@ -399,13 +463,15 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                 </Typography>
 
                 <Typography variant="body2">
-                  <strong>Asymmetric (+/-):</strong> Tolerance can be different in positive and negative directions
+                  <strong>Asymmetric (+/-):</strong> Tolerance can be different in positive and
+                  negative directions
                   <br />
                   Example: 10.0 +0.3/-0.5 mm (9.5 to 10.3 mm)
                 </Typography>
 
                 <Typography variant="body2">
-                  Switch between modes using the "Tolerance Mode" radio buttons at the top of the page.
+                  Switch between modes using the "Tolerance Mode" radio buttons at the top of the
+                  page.
                 </Typography>
               </Box>
             </AccordionDetails>
@@ -427,12 +493,13 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                 </Typography>
 
                 <Typography variant="body2">
-                  <strong>Export CSV:</strong> Exports tolerance data and results to a CSV file for use in Excel or other spreadsheet applications
+                  <strong>Export CSV:</strong> Exports tolerance data and results to a CSV file for
+                  use in Excel or other spreadsheet applications
                 </Typography>
 
                 <Typography variant="body2">
-                  <strong>Import from CSV:</strong> Import tolerance items from a CSV file with column mapping support.
-                  Available in each tolerance stack tab.
+                  <strong>Import from CSV:</strong> Import tolerance items from a CSV file with
+                  column mapping support. Available in each tolerance stack tab.
                 </Typography>
               </Box>
             </AccordionDetails>
@@ -467,7 +534,8 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                   • Use the duplicate feature to create variations of existing stacks
                 </Typography>
                 <Typography variant="body2">
-                  • Enable multi-unit display in settings to see results in multiple units simultaneously
+                  • Enable multi-unit display in settings to see results in multiple units
+                  simultaneously
                 </Typography>
               </Box>
             </AccordionDetails>

@@ -25,9 +25,10 @@ const ToleranceItemNode: React.FC<NodeProps<ToleranceItemNodeData>> = ({ data })
     : 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)';
 
   // Format tolerance display based on mode
-  const toleranceDisplay = toleranceMode === 'symmetric'
-    ? `±${item.tolerancePlus.toFixed(3)} ${unit}`
-    : `+${item.tolerancePlus.toFixed(3)}/-${item.toleranceMinus.toFixed(3)} ${unit}`;
+  const toleranceDisplay =
+    toleranceMode === 'symmetric'
+      ? `±${item.tolerancePlus.toFixed(3)} ${unit}`
+      : `+${item.tolerancePlus.toFixed(3)}/-${item.toleranceMinus.toFixed(3)} ${unit}`;
 
   // Has metadata?
   const hasMetadata = Boolean(item.notes || item.source);

@@ -31,7 +31,11 @@ interface ProjectMetadataEditorProps {
   unit: ToleranceUnit;
   analysisSettings: AnalysisSettings;
   onClose: () => void;
-  onSave: (metadata: ProjectMetadata, unit: ToleranceUnit, analysisSettings: AnalysisSettings) => void;
+  onSave: (
+    metadata: ProjectMetadata,
+    unit: ToleranceUnit,
+    analysisSettings: AnalysisSettings
+  ) => void;
 }
 
 const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
@@ -86,10 +90,7 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
     <Dialog open={open} onClose={handleCancel} maxWidth="md" fullWidth>
       <DialogTitle>
         Project Settings
-        <IconButton
-          onClick={handleCancel}
-          sx={{ position: 'absolute', right: 8, top: 8 }}
-        >
+        <IconButton onClick={handleCancel} sx={{ position: 'absolute', right: 8, top: 8 }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -295,8 +296,8 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
               label="Enable Monte Carlo Simulation"
             />
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
-              When enabled, Monte Carlo option will appear in the Calculation Mode selector.
-              Monte Carlo is a probabilistic simulation method for tolerance analysis.
+              When enabled, Monte Carlo option will appear in the Calculation Mode selector. Monte
+              Carlo is a probabilistic simulation method for tolerance analysis.
             </Typography>
           </Grid>
 
@@ -311,17 +312,24 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
               <FormLabel>Default Iterations</FormLabel>
               <RadioGroup
                 value={
-                  editedSettings.monteCarloSettings?.iterations === 10000 ? '10k' :
-                  editedSettings.monteCarloSettings?.iterations === 100000 ? '100k' :
-                  editedSettings.monteCarloSettings?.iterations === 50000 ? '50k' :
-                  'custom'
+                  editedSettings.monteCarloSettings?.iterations === 10000
+                    ? '10k'
+                    : editedSettings.monteCarloSettings?.iterations === 100000
+                      ? '100k'
+                      : editedSettings.monteCarloSettings?.iterations === 50000
+                        ? '50k'
+                        : 'custom'
                 }
                 onChange={(e) => {
                   const value = e.target.value;
-                  const iterations = value === '10k' ? 10000 :
-                                    value === '100k' ? 100000 :
-                                    value === '50k' ? 50000 :
-                                    editedSettings.monteCarloSettings?.iterations || 50000;
+                  const iterations =
+                    value === '10k'
+                      ? 10000
+                      : value === '100k'
+                        ? 100000
+                        : value === '50k'
+                          ? 50000
+                          : editedSettings.monteCarloSettings?.iterations || 50000;
                   setEditedSettings({
                     ...editedSettings,
                     monteCarloSettings: {
@@ -340,29 +348,34 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
           </Grid>
 
           {editedSettings.monteCarloSettings?.iterations !== 10000 &&
-           editedSettings.monteCarloSettings?.iterations !== 50000 &&
-           editedSettings.monteCarloSettings?.iterations !== 100000 && (
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Custom Iteration Count"
-                type="number"
-                fullWidth
-                value={editedSettings.monteCarloSettings?.iterations || 50000}
-                onChange={(e) => {
-                  const iterations = Math.max(1000, Math.min(1000000, parseInt(e.target.value) || 50000));
-                  setEditedSettings({
-                    ...editedSettings,
-                    monteCarloSettings: {
-                      ...(editedSettings.monteCarloSettings || { useAdvancedDistributions: false }),
-                      iterations,
-                    },
-                  });
-                }}
-                inputProps={{ min: 1000, max: 1000000, step: 1000 }}
-                helperText="Range: 1,000 - 1,000,000"
-              />
-            </Grid>
-          )}
+            editedSettings.monteCarloSettings?.iterations !== 50000 &&
+            editedSettings.monteCarloSettings?.iterations !== 100000 && (
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Custom Iteration Count"
+                  type="number"
+                  fullWidth
+                  value={editedSettings.monteCarloSettings?.iterations || 50000}
+                  onChange={(e) => {
+                    const iterations = Math.max(
+                      1000,
+                      Math.min(1000000, parseInt(e.target.value) || 50000)
+                    );
+                    setEditedSettings({
+                      ...editedSettings,
+                      monteCarloSettings: {
+                        ...(editedSettings.monteCarloSettings || {
+                          useAdvancedDistributions: false,
+                        }),
+                        iterations,
+                      },
+                    });
+                  }}
+                  inputProps={{ min: 1000, max: 1000000, step: 1000 }}
+                  helperText="Range: 1,000 - 1,000,000"
+                />
+              </Grid>
+            )}
 
           <Grid item xs={12}>
             <FormControlLabel

@@ -87,7 +87,10 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
           const newToleranceMinus = Math.max(0, item.originalToleranceMinus + adjustmentValue);
 
           // Limit adjustment if it would cause negative tolerance
-          const maxNegativeAdjustment = Math.max(-item.originalTolerancePlus, -item.originalToleranceMinus);
+          const maxNegativeAdjustment = Math.max(
+            -item.originalTolerancePlus,
+            -item.originalToleranceMinus
+          );
           const clampedAdjustment = Math.max(maxNegativeAdjustment, adjustmentValue);
 
           return {
@@ -145,17 +148,15 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle>
         Sensitivity Analysis
-        <IconButton
-          onClick={onClose}
-          sx={{ position: 'absolute', right: 8, top: 8 }}
-        >
+        <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
 
       <DialogContent dividers>
         <Alert severity="info" sx={{ mb: 2 }}>
-          Adjust tolerance values to see their impact on the total RSS. This helps identify optimization opportunities.
+          Adjust tolerance values to see their impact on the total RSS. This helps identify
+          optimization opportunities.
         </Alert>
 
         <Grid container spacing={2}>
@@ -186,7 +187,11 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                       {totalChange > 0 ? '+' : ''}
                       {totalChange.toFixed(4)} {unit}
                       {totalChangePercent !== null && (
-                        <> ({totalChangePercent > 0 ? '+' : ''}{totalChangePercent.toFixed(1)}%)</>
+                        <>
+                          {' '}
+                          ({totalChangePercent > 0 ? '+' : ''}
+                          {totalChangePercent.toFixed(1)}%)
+                        </>
                       )}
                     </Typography>
                     <Button
@@ -230,9 +235,18 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                     }}
                     onClick={() => setSelectedItemId(item.id)}
                   >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
                       <Box>
-                        <Typography variant="body2" sx={{ fontWeight: isSelected ? 'bold' : 'normal' }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: isSelected ? 'bold' : 'normal' }}
+                        >
                           {item.name}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
@@ -260,10 +274,15 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
           <Grid item xs={12} md={7}>
             {selectedItem && (
               <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2">
-                    Adjust: {selectedItem.name}
-                  </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    mb: 2,
+                  }}
+                >
+                  <Typography variant="subtitle2">Adjust: {selectedItem.name}</Typography>
                   {Math.abs(selectedItem.adjustmentValue) > 0.001 && (
                     <Button
                       size="small"
@@ -299,7 +318,8 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                          {selectedItem.adjustmentValue > 0 ? '+' : ''}{selectedItem.adjustmentValue.toFixed(3)} {unit}
+                          {selectedItem.adjustmentValue > 0 ? '+' : ''}
+                          {selectedItem.adjustmentValue.toFixed(3)} {unit}
                         </Typography>
                       </Box>
                     </Grid>
@@ -308,7 +328,12 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                   <Divider sx={{ my: 2 }} />
 
                   <Box sx={{ mb: 2 }}>
-                    <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      gutterBottom
+                      sx={{ display: 'block' }}
+                    >
                       Direct Input
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -316,7 +341,9 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                       <input
                         type="number"
                         value={selectedItem.adjustmentValue.toFixed(3)}
-                        onChange={(e) => handleAdjustment(selectedItem.id, parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          handleAdjustment(selectedItem.id, parseFloat(e.target.value) || 0)
+                        }
                         step={increment}
                         min={-selectedItem.originalTolerancePlus}
                         title={`Minimum: ${(-selectedItem.originalTolerancePlus).toFixed(3)} (cannot go below 0 tolerance)`}
@@ -330,13 +357,24 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                       />
                       <Typography variant="body2">{unit}</Typography>
                     </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                      Range: {(-selectedItem.originalTolerancePlus).toFixed(3)} to unlimited (tolerance cannot go below 0)
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ mt: 0.5, display: 'block' }}
+                    >
+                      Range: {(-selectedItem.originalTolerancePlus).toFixed(3)} to unlimited
+                      (tolerance cannot go below 0)
                     </Typography>
                   </Box>
 
-                  <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
-                    Or use slider (min: {(-selectedItem.originalTolerancePlus).toFixed(3)}, max: +5 {unit})
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    gutterBottom
+                    sx={{ display: 'block' }}
+                  >
+                    Or use slider (min: {(-selectedItem.originalTolerancePlus).toFixed(3)}, max: +5{' '}
+                    {unit})
                   </Typography>
                   <Slider
                     value={selectedItem.adjustmentValue}
@@ -345,7 +383,10 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                     max={5}
                     step={increment}
                     marks={[
-                      { value: Math.max(-5, -selectedItem.originalTolerancePlus), label: Math.max(-5, -selectedItem.originalTolerancePlus).toFixed(1) },
+                      {
+                        value: Math.max(-5, -selectedItem.originalTolerancePlus),
+                        label: Math.max(-5, -selectedItem.originalTolerancePlus).toFixed(1),
+                      },
                       { value: 0, label: '0' },
                       { value: 5, label: '+5' },
                     ]}
@@ -357,12 +398,21 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                   {selectedItem.tolerancePlus === 0 && (
                     <Alert severity="error" sx={{ mb: 1 }}>
                       <Typography variant="caption">
-                        <strong>Warning:</strong> Tolerance is at minimum (0 {unit}). Cannot reduce further.
+                        <strong>Warning:</strong> Tolerance is at minimum (0 {unit}). Cannot reduce
+                        further.
                       </Typography>
                     </Alert>
                   )}
 
-                  <Alert severity={selectedItem.adjustmentValue < 0 ? 'success' : selectedItem.adjustmentValue > 0 ? 'warning' : 'info'}>
+                  <Alert
+                    severity={
+                      selectedItem.adjustmentValue < 0
+                        ? 'success'
+                        : selectedItem.adjustmentValue > 0
+                          ? 'warning'
+                          : 'info'
+                    }
+                  >
                     {selectedItem.adjustmentValue === 0 && (
                       <Typography variant="caption">
                         Use the slider to adjust this tolerance and see the impact on the total RSS.
@@ -370,22 +420,34 @@ const SensitivityAnalysisDialog: React.FC<SensitivityAnalysisDialogProps> = ({
                     )}
                     {selectedItem.adjustmentValue < 0 && selectedItem.tolerancePlus > 0 && (
                       <Typography variant="caption">
-                        <strong>Tightening tolerance</strong> by {Math.abs(selectedItem.adjustmentValue).toFixed(3)} {unit} reduces the total RSS.
+                        <strong>Tightening tolerance</strong> by{' '}
+                        {Math.abs(selectedItem.adjustmentValue).toFixed(3)} {unit} reduces the total
+                        RSS.
                       </Typography>
                     )}
                     {selectedItem.adjustmentValue > 0 && (
                       <Typography variant="caption">
-                        <strong>Loosening tolerance</strong> by {selectedItem.adjustmentValue.toFixed(3)} {unit} increases the total RSS.
+                        <strong>Loosening tolerance</strong> by{' '}
+                        {selectedItem.adjustmentValue.toFixed(3)} {unit} increases the total RSS.
                       </Typography>
                     )}
                   </Alert>
 
                   <Box sx={{ mt: 2 }}>
-                    <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block' }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      gutterBottom
+                      sx={{ display: 'block' }}
+                    >
                       Sensitivity Analysis
                     </Typography>
                     <Typography variant="body2">
-                      A {increment.toFixed(3)} {unit} change in this tolerance causes a <strong>{calculateSensitivity(selectedItem).toFixed(4)} {unit}</strong> change in total RSS.
+                      A {increment.toFixed(3)} {unit} change in this tolerance causes a{' '}
+                      <strong>
+                        {calculateSensitivity(selectedItem).toFixed(4)} {unit}
+                      </strong>{' '}
+                      change in total RSS.
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Higher sensitivity = greater impact on total tolerance stack

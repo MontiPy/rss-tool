@@ -132,15 +132,19 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell><strong>Item</strong></TableCell>
-              <TableCell align="right"><strong>Nominal</strong></TableCell>
+              <TableCell>
+                <strong>Item</strong>
+              </TableCell>
               <TableCell align="right">
-                <strong>
-                  {toleranceMode === 'symmetric' ? 'Tolerance (±)' : 'Tolerance (+)'}
-                </strong>
+                <strong>Nominal</strong>
+              </TableCell>
+              <TableCell align="right">
+                <strong>{toleranceMode === 'symmetric' ? 'Tolerance (±)' : 'Tolerance (+)'}</strong>
               </TableCell>
               {toleranceMode === 'asymmetric' && (
-                <TableCell align="right"><strong>Tolerance (-)</strong></TableCell>
+                <TableCell align="right">
+                  <strong>Tolerance (-)</strong>
+                </TableCell>
               )}
               {calculationMode !== 'monteCarlo' && (
                 <TableCell align="center">
@@ -148,10 +152,16 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                 </TableCell>
               )}
               {calculationMode === 'monteCarlo' && useAdvancedDistributions && (
-                <TableCell align="center"><strong>Distribution</strong></TableCell>
+                <TableCell align="center">
+                  <strong>Distribution</strong>
+                </TableCell>
               )}
-              <TableCell align="center"><strong>Image</strong></TableCell>
-              <TableCell align="center"><strong>Actions</strong></TableCell>
+              <TableCell align="center">
+                <strong>Image</strong>
+              </TableCell>
+              <TableCell align="center">
+                <strong>Actions</strong>
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -212,14 +222,23 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                 )}
                 {calculationMode !== 'monteCarlo' && (
                   <TableCell align="center">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 0.5,
+                      }}
+                    >
                       <Checkbox
                         checked={item.floatFactor > 1.5}
-                        onChange={(e) => handleItemChange(
-                          item.id,
-                          'floatFactor',
-                          e.target.checked ? FLOAT_FACTORS.SQRT3 : FLOAT_FACTORS.FIXED
-                        )}
+                        onChange={(e) =>
+                          handleItemChange(
+                            item.id,
+                            'floatFactor',
+                            e.target.checked ? FLOAT_FACTORS.SQRT3 : FLOAT_FACTORS.FIXED
+                          )
+                        }
                         size="small"
                       />
                       <Typography variant="caption" color="text.secondary">
@@ -232,7 +251,9 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                   <TableCell align="center">
                     <Select
                       value={item.distributionType || 'normal'}
-                      onChange={(e) => handleItemChange(item.id, 'distributionType', e.target.value)}
+                      onChange={(e) =>
+                        handleItemChange(item.id, 'distributionType', e.target.value)
+                      }
                       size="small"
                       sx={{ width: 110 }}
                     >
@@ -259,10 +280,7 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Duplicate item">
-                    <IconButton
-                      onClick={() => handleDuplicateItem(item.id)}
-                      size="small"
-                    >
+                    <IconButton onClick={() => handleDuplicateItem(item.id)} size="small">
                       <ContentCopyIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
@@ -281,21 +299,19 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
         </Table>
       </TableContainer>
       <Box mt={1}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleAddItem}
-          size="small"
-        >
+        <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddItem} size="small">
           Add Row
         </Button>
       </Box>
 
       {/* Notes/Source Dialog */}
-      <Dialog open={notesDialogOpen} onClose={() => setNotesDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Item Details: {editingItem?.name}
-        </DialogTitle>
+      <Dialog
+        open={notesDialogOpen}
+        onClose={() => setNotesDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Item Details: {editingItem?.name}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <TextField

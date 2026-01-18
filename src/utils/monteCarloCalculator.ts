@@ -1,4 +1,11 @@
-import { ToleranceItem, MonteCarloResult, MonteCarloSettings, DistributionType, HistogramBin, PercentileData } from '../types';
+import {
+  ToleranceItem,
+  MonteCarloResult,
+  MonteCarloSettings,
+  DistributionType,
+  HistogramBin,
+  PercentileData,
+} from '../types';
 
 /**
  * Generate random sample from normal distribution using Box-Muller transform
@@ -63,11 +70,12 @@ function sampleTolerance(
   if (tolerance === 0) return 0;
 
   switch (distributionType) {
-    case 'normal':
+    case 'normal': {
       // Assume tolerance is 3σ, so σ = tolerance/3
       // Sample from N(0, σ) - can be positive or negative
       const sigma = tolerance / 3;
       return generateNormal(0, sigma);
+    }
 
     case 'uniform':
       // Sample uniformly between -tolerance and +tolerance
@@ -101,13 +109,13 @@ function createHistogram(samples: number[], numBins: number): HistogramBin[] {
   }));
 
   // Count samples in each bin
-  samples.forEach(value => {
+  samples.forEach((value) => {
     const binIndex = Math.min(Math.floor((value - min) / binWidth), numBins - 1);
     bins[binIndex].count++;
   });
 
   // Normalize frequencies
-  bins.forEach(bin => {
+  bins.forEach((bin) => {
     bin.frequency = bin.count / samples.length;
   });
 
@@ -156,7 +164,7 @@ export function runMonteCarloSimulation(
   const itemSamplesMap = new Map<string, number[]>();
 
   // Initialize item sample arrays
-  items.forEach(item => {
+  items.forEach((item) => {
     itemSamplesMap.set(item.id, []);
   });
 
@@ -164,7 +172,7 @@ export function runMonteCarloSimulation(
   for (let i = 0; i < iterations; i++) {
     let totalDeviation = 0;
 
-    items.forEach(item => {
+    items.forEach((item) => {
       const distributionType = getDistributionType(item, useAdvancedDistributions);
 
       // Sample tolerance value (signed deviation from nominal)
@@ -193,13 +201,13 @@ export function runMonteCarloSimulation(
 
   // Create histograms for individual items (30 bins each)
   const itemHistograms = new Map<string, HistogramBin[]>();
-  items.forEach(item => {
+  items.forEach((item) => {
     const itemSamples = itemSamplesMap.get(item.id)!;
     itemHistograms.set(item.id, createHistogram(itemSamples, 30));
   });
 
   // Calculate item contributions (mean and stdDev of each item's samples)
-  const itemContributions = items.map(item => {
+  const itemContributions = items.map((item) => {
     const samples = itemSamplesMap.get(item.id)!;
     const mean = samples.reduce((sum, x) => sum + x, 0) / samples.length;
     const variance = samples.reduce((sum, x) => sum + (x - mean) ** 2, 0) / samples.length;
@@ -220,15 +228,11 @@ export function runMonteCarloSimulation(
   let riskAnalysis;
   if (usl !== undefined || lsl !== undefined) {
     // Count samples exceeding USL (values greater than upper limit)
-    const exceedingUSL = usl !== undefined
-      ? stackSamples.filter(x => x > usl).length
-      : 0;
+    const exceedingUSL = usl !== undefined ? stackSamples.filter((x) => x > usl).length : 0;
     const probabilityExceedingUSL = exceedingUSL / iterations;
 
     // Count samples exceeding LSL (values less than lower limit)
-    const exceedingLSL = lsl !== undefined
-      ? stackSamples.filter(x => x < lsl).length
-      : 0;
+    const exceedingLSL = lsl !== undefined ? stackSamples.filter((x) => x < lsl).length : 0;
     const probabilityExceedingLSL = exceedingLSL / iterations;
 
     // Total out-of-spec probability (either side)

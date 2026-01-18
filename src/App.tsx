@@ -15,7 +15,6 @@ import {
   Radio,
   Paper,
   IconButton,
-  createTheme,
   ThemeProvider,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -24,50 +23,30 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
-import { ProjectData, Direction, ToleranceMode, ProjectMetadata, ToleranceUnit, CalculationMode, AnalysisSettings } from './types';
+import { ToleranceMode, CalculationMode, ProjectData } from './types';
 import DirectionTab from './components/DirectionTab';
 import FileControls from './components/FileControls';
 import ProjectMetadataEditor from './components/ProjectMetadataEditor';
 import HelpDialog from './components/HelpDialog';
+import { theme, MONOSPACE_FONT } from './theme';
+import { useProjectData } from './hooks/useProjectData';
 
-// Custom theme with Yu Gothic font and increased font size
-const theme = createTheme({
-  typography: {
-    fontFamily: "'Yu Gothic', 'Yu Gothic UI', 'Segoe UI', 'Helvetica Neue', sans-serif",
-    fontSize: 13,
-  },
-});
-
-// Monospace font for numeric values
-export const MONOSPACE_FONT = "'Consolas', 'Monaco', 'Courier New', monospace";
+// Re-export for compatibility if used elsewhere
+export { MONOSPACE_FONT };
 
 function App() {
-  const [projectData, setProjectData] = useState<ProjectData>({
-    toleranceMode: 'symmetric',
-    unit: 'mm',
-    directions: [
-      {
-        id: 'dir-1',
-        name: 'Stack 1',
-        items: [],
-      },
-    ],
-    metadata: {
-      createdDate: new Date().toISOString(),
-      modifiedDate: new Date().toISOString(),
-    },
-    analysisSettings: {
-      calculationMode: 'rss',
-      showMultiUnit: false,
-      contributionThreshold: 40,
-      sensitivityIncrement: 0.1,
-      enableMonteCarlo: false,
-      monteCarloSettings: {
-        iterations: 50000,
-        useAdvancedDistributions: false,
-      },
-    },
-  });
+  const {
+    projectData,
+    updateToleranceMode,
+    updateCalculationMode,
+    updateDirection,
+    addDirection,
+    deleteDirection,
+    duplicateDirection,
+    renameDirection,
+    loadProject,
+    updateMetadata,
+  } = useProjectData();
 
   const [activeTab, setActiveTab] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -75,83 +54,28 @@ function App() {
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
 
-  const handleToleranceModeChange = (mode: ToleranceMode) => {
-    setProjectData({
-      ...projectData,
-      toleranceMode: mode,
-    });
-  };
-
-  const handleCalculationModeChange = (mode: CalculationMode) => {
-    setProjectData({
-      ...projectData,
-      analysisSettings: {
-        ...projectData.analysisSettings!,
-        calculationMode: mode,
-      },
-    });
-  };
-
-  const handleDirectionChange = (updatedDirection: Direction) => {
-    setProjectData({
-      ...projectData,
-      directions: projectData.directions.map((dir) =>
-        dir.id === updatedDirection.id ? updatedDirection : dir
-      ),
-    });
-  };
-
   const handleAddDirection = () => {
-    const newDirection: Direction = {
-      id: `dir-${Date.now()}`,
-      name: `Stack ${projectData.directions.length + 1}`,
-      items: [],
-    };
-    setProjectData({
-      ...projectData,
-      directions: [...projectData.directions, newDirection],
-    });
-    setActiveTab(projectData.directions.length);
+    const newIndex = addDirection();
+    setActiveTab(newIndex);
   };
 
   const handleDeleteDirection = (directionId: string) => {
-    if (projectData.directions.length <= 1) {
-      alert('Cannot delete the last direction');
-      return;
-    }
-
-    setProjectData({
-      ...projectData,
-      directions: projectData.directions.filter((dir) => dir.id !== directionId),
-    });
-
-    // Adjust active tab if necessary
-    if (activeTab >= projectData.directions.length - 1) {
-      setActiveTab(Math.max(0, activeTab - 1));
+    try {
+      deleteDirection(directionId);
+      // Adjust active tab if necessary
+      if (activeTab >= projectData.directions.length - 1) {
+        setActiveTab(Math.max(0, activeTab - 1));
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Cannot delete direction');
     }
   };
 
   const handleDuplicateDirection = (directionId: string) => {
-    const direction = projectData.directions.find((dir) => dir.id === directionId);
-    if (!direction) return;
-
-    const duplicatedDirection: Direction = {
-      ...direction,
-      id: `dir-${Date.now()}`,
-      name: `${direction.name} (Copy)`,
-      items: direction.items.map((item) => ({
-        ...item,
-        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      })),
-    };
-
-    setProjectData({
-      ...projectData,
-      directions: [...projectData.directions, duplicatedDirection],
-    });
-
-    // Switch to the new duplicated tab
-    setActiveTab(projectData.directions.length);
+    const newIndex = duplicateDirection(directionId);
+    if (newIndex !== undefined) {
+      setActiveTab(newIndex);
+    }
   };
 
   const handleStartRenaming = (directionId: string, currentName: string) => {
@@ -161,12 +85,7 @@ function App() {
 
   const handleSaveRename = () => {
     if (editingTabId && editingTabName.trim()) {
-      setProjectData({
-        ...projectData,
-        directions: projectData.directions.map((dir) =>
-          dir.id === editingTabId ? { ...dir, name: editingTabName.trim() } : dir
-        ),
-      });
+      renameDirection(editingTabId, editingTabName);
     }
     setEditingTabId(null);
     setEditingTabName('');
@@ -178,242 +97,234 @@ function App() {
   };
 
   const handleLoadProject = (data: ProjectData) => {
-    setProjectData(data);
+    loadProject(data);
     setActiveTab(0);
-  };
-
-  const handleSaveMetadata = (metadata: ProjectMetadata, unit: ToleranceUnit, analysisSettings: AnalysisSettings) => {
-    setProjectData({
-      ...projectData,
-      metadata,
-      unit,
-      analysisSettings,
-    });
   };
 
   return (
     <ThemeProvider theme={theme}>
       <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            {projectData.metadata?.projectName || 'RSS Tolerance Stack Calculator'}
-          </Typography>
-          <IconButton color="inherit" onClick={() => setHelpOpen(true)} title="Help">
-            <HelpOutlineIcon />
-          </IconButton>
-          <IconButton color="inherit" onClick={() => setSettingsOpen(true)} title="Settings">
-            <SettingsIcon />
-          </IconButton>
-        </Toolbar>
-      </AppBar>
+        <AppBar position="static">
+          <Toolbar>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              {projectData.metadata?.projectName || 'RSS Tolerance Stack Calculator'}
+            </Typography>
+            <IconButton color="inherit" onClick={() => setHelpOpen(true)} title="Help">
+              <HelpOutlineIcon />
+            </IconButton>
+            <IconButton color="inherit" onClick={() => setSettingsOpen(true)} title="Settings">
+              <SettingsIcon />
+            </IconButton>
+          </Toolbar>
+        </AppBar>
 
-      <Container maxWidth="xl" sx={{ mt: 2, mb: 2 }}>
-        {/* Control Panel */}
-        <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
-            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              <FormControl component="fieldset">
-                <FormLabel component="legend">Tolerance Mode</FormLabel>
-                <RadioGroup
-                  row
-                  value={projectData.toleranceMode}
-                  onChange={(e) => handleToleranceModeChange(e.target.value as ToleranceMode)}
-                >
-                  <FormControlLabel
-                    value="symmetric"
-                    control={<Radio />}
-                    label="Symmetric (±)"
-                  />
-                  <FormControlLabel
-                    value="asymmetric"
-                    control={<Radio />}
-                    label="Asymmetric (+/-)"
-                  />
-                </RadioGroup>
-              </FormControl>
-
-              <FormControl component="fieldset">
-                <FormLabel component="legend">Calculation Mode</FormLabel>
-                <RadioGroup
-                  row
-                  value={projectData.analysisSettings?.calculationMode || 'rss'}
-                  onChange={(e) => handleCalculationModeChange(e.target.value as CalculationMode)}
-                >
-                  <FormControlLabel
-                    value="rss"
-                    control={<Radio />}
-                    label="RSS (Statistical)"
-                  />
-                  <FormControlLabel
-                    value="worstCase"
-                    control={<Radio />}
-                    label="Worst-Case"
-                  />
-                  {projectData.analysisSettings?.enableMonteCarlo && (
-                    <FormControlLabel
-                      value="monteCarlo"
-                      control={<Radio />}
-                      label="Monte Carlo"
-                    />
-                  )}
-                </RadioGroup>
-              </FormControl>
-            </Box>
-
-            <FileControls projectData={projectData} onLoad={handleLoadProject} />
-          </Box>
-        </Paper>
-
-        {/* Direction Tabs */}
-        <Paper elevation={2}>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center' }}>
-            <Tabs
-              value={activeTab}
-              onChange={(_, newValue) => setActiveTab(newValue)}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{ flexGrow: 1 }}
+        <Container maxWidth="xl" sx={{ mt: 2, mb: 2 }}>
+          {/* Control Panel */}
+          <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 2,
+                flexWrap: 'wrap',
+              }}
             >
-              {projectData.directions.map((direction, index) => (
-                <Tab
-                  key={direction.id}
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {editingTabId === direction.id ? (
+              <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                <FormControl component="fieldset">
+                  <FormLabel component="legend">Tolerance Mode</FormLabel>
+                  <RadioGroup
+                    row
+                    value={projectData.toleranceMode}
+                    onChange={(e) => updateToleranceMode(e.target.value as ToleranceMode)}
+                  >
+                    <FormControlLabel value="symmetric" control={<Radio />} label="Symmetric (±)" />
+                    <FormControlLabel
+                      value="asymmetric"
+                      control={<Radio />}
+                      label="Asymmetric (+/-)"
+                    />
+                  </RadioGroup>
+                </FormControl>
+
+                <FormControl component="fieldset">
+                  <FormLabel component="legend">Calculation Mode</FormLabel>
+                  <RadioGroup
+                    row
+                    value={projectData.analysisSettings?.calculationMode || 'rss'}
+                    onChange={(e) => updateCalculationMode(e.target.value as CalculationMode)}
+                  >
+                    <FormControlLabel value="rss" control={<Radio />} label="RSS (Statistical)" />
+                    <FormControlLabel value="worstCase" control={<Radio />} label="Worst-Case" />
+                    {projectData.analysisSettings?.enableMonteCarlo && (
+                      <FormControlLabel
+                        value="monteCarlo"
+                        control={<Radio />}
+                        label="Monte Carlo"
+                      />
+                    )}
+                  </RadioGroup>
+                </FormControl>
+              </Box>
+
+              <FileControls projectData={projectData} onLoad={handleLoadProject} />
+            </Box>
+          </Paper>
+
+          {/* Direction Tabs */}
+          <Paper elevation={2}>
+            <Box
+              sx={{
+                borderBottom: 1,
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <Tabs
+                value={activeTab}
+                onChange={(_, newValue) => setActiveTab(newValue)}
+                variant="scrollable"
+                scrollButtons="auto"
+                sx={{ flexGrow: 1 }}
+              >
+                {projectData.directions.map((direction, index) => (
+                  <Tab
+                    key={direction.id}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {editingTabId === direction.id ? (
                         <input
                           type="text"
+                          aria-label="Rename stack"
                           value={editingTabName}
-                          onChange={(e) => setEditingTabName(e.target.value)}
-                          onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleSaveRename();
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              handleCancelRename();
-                            }
-                          }}
-                          onBlur={handleSaveRename}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          autoFocus
-                          style={{
-                            padding: '4px 8px',
-                            fontSize: '0.875rem',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            minWidth: '100px',
-                            outline: 'none',
-                          }}
-                        />
-                      ) : (
-                        <span style={{ cursor: 'pointer' }}>
-                          {direction.name}
-                        </span>
-                      )}
-                      {activeTab === index && editingTabId !== direction.id && (
+                            onChange={(e) => setEditingTabName(e.target.value)}
+                            onKeyDown={(e) => {
+                              e.stopPropagation();
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveRename();
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                handleCancelRename();
+                              }
+                            }}
+                            onBlur={handleSaveRename}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            autoFocus
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '0.875rem',
+                              border: '1px solid #ccc',
+                              borderRadius: '4px',
+                              minWidth: '100px',
+                              outline: 'none',
+                            }}
+                          />
+                        ) : (
+                          <span style={{ cursor: 'pointer' }}>{direction.name}</span>
+                        )}
+                        {activeTab === index && editingTabId !== direction.id && (
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartRenaming(direction.id, direction.name);
+                            }}
+                            title="Rename stack"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        )}
                         <IconButton
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleStartRenaming(direction.id, direction.name);
+                            handleDuplicateDirection(direction.id);
                           }}
-                          title="Rename stack"
+                          title="Duplicate this stack"
                         >
-                          <EditIcon fontSize="small" />
+                          <ContentCopyIcon fontSize="small" />
                         </IconButton>
-                      )}
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDuplicateDirection(direction.id);
-                        }}
-                        title="Duplicate this stack"
-                      >
-                        <ContentCopyIcon fontSize="small" />
-                      </IconButton>
-                      {projectData.directions.length > 1 && (
-                        <IconButton
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteDirection(direction.id);
-                          }}
-                          title="Delete this stack"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      )}
-                    </Box>
-                  }
-                />
-              ))}
-            </Tabs>
-            <Button
-              startIcon={<AddIcon />}
-              onClick={handleAddDirection}
-              sx={{ m: 1 }}
-              variant="outlined"
-              size="small"
-            >
-              Add Tolerance Stack
-            </Button>
-          </Box>
-
-          <Box sx={{ p: 2 }}>
-            {projectData.directions.map((direction, index) => (
-              <Box
-                key={direction.id}
-                role="tabpanel"
-                hidden={activeTab !== index}
-              >
-                {activeTab === index && (
-                  <DirectionTab
-                    direction={direction}
-                    toleranceMode={projectData.toleranceMode}
-                    unit={projectData.unit || 'mm'}
-                    calculationMode={projectData.analysisSettings?.calculationMode || 'rss'}
-                    analysisSettings={projectData.analysisSettings}
-                    onDirectionChange={handleDirectionChange}
+                        {projectData.directions.length > 1 && (
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteDirection(direction.id);
+                            }}
+                            title="Delete this stack"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                      </Box>
+                    }
                   />
-                )}
-              </Box>
-            ))}
+                ))}
+              </Tabs>
+              <Button
+                startIcon={<AddIcon />}
+                onClick={handleAddDirection}
+                sx={{ m: 1 }}
+                variant="outlined"
+                size="small"
+              >
+                Add Tolerance Stack
+              </Button>
+            </Box>
+
+            <Box sx={{ p: 2 }}>
+              {projectData.directions.map((direction, index) => (
+                <Box key={direction.id} role="tabpanel" hidden={activeTab !== index}>
+                  {activeTab === index && (
+                    <DirectionTab
+                      direction={direction}
+                      toleranceMode={projectData.toleranceMode}
+                      unit={projectData.unit || 'mm'}
+                      calculationMode={projectData.analysisSettings?.calculationMode || 'rss'}
+                      analysisSettings={projectData.analysisSettings}
+                      onDirectionChange={updateDirection}
+                    />
+                  )}
+                </Box>
+              ))}
+            </Box>
+          </Paper>
+
+          {/* Footer */}
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Typography variant="caption" color="text.secondary">
+              RSS Tolerance Stack Calculator - Root Sum Square with Float Factor (√3) Support
+            </Typography>
           </Box>
-        </Paper>
+        </Container>
 
-        {/* Footer */}
-        <Box sx={{ mt: 2, textAlign: 'center' }}>
-          <Typography variant="caption" color="text.secondary">
-            RSS Tolerance Stack Calculator - Root Sum Square with Float Factor (√3) Support
-          </Typography>
-        </Box>
-      </Container>
+        {/* Project Settings Dialog */}
+        <ProjectMetadataEditor
+          open={settingsOpen}
+          metadata={projectData.metadata || {}}
+          unit={projectData.unit || 'mm'}
+          analysisSettings={
+            projectData.analysisSettings || {
+              calculationMode: 'rss',
+              showMultiUnit: false,
+              contributionThreshold: 40,
+              sensitivityIncrement: 0.1,
+              enableMonteCarlo: false,
+              monteCarloSettings: {
+                iterations: 50000,
+                useAdvancedDistributions: false,
+              },
+            }
+          }
+          onClose={() => setSettingsOpen(false)}
+          onSave={updateMetadata}
+        />
 
-      {/* Project Settings Dialog */}
-      <ProjectMetadataEditor
-        open={settingsOpen}
-        metadata={projectData.metadata || {}}
-        unit={projectData.unit || 'mm'}
-        analysisSettings={projectData.analysisSettings || {
-          calculationMode: 'rss',
-          showMultiUnit: false,
-          contributionThreshold: 40,
-          sensitivityIncrement: 0.1,
-          enableMonteCarlo: false,
-        }}
-        onClose={() => setSettingsOpen(false)}
-        onSave={handleSaveMetadata}
-      />
-
-      {/* Help Dialog */}
-      <HelpDialog
-        open={helpOpen}
-        onClose={() => setHelpOpen(false)}
-      />
+        {/* Help Dialog */}
+        <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
       </Box>
     </ThemeProvider>
   );

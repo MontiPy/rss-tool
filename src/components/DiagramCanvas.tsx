@@ -87,9 +87,7 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
 
             // Tolerance items: orange for floating, blue for fixed
             const data = node.data as { item?: { floatFactor: number } };
-            return data.item?.floatFactor && data.item.floatFactor > 1.0
-              ? '#ff9800'
-              : '#1976d2';
+            return data.item?.floatFactor && data.item.floatFactor > 1.0 ? '#ff9800' : '#1976d2';
           }}
           nodeStrokeWidth={3}
           zoomable

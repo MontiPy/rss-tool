@@ -112,14 +112,19 @@ export function getFloatFactor(): number {
 
 /**
  * Convert value from one unit to another
+ *
+ * @param value - The numeric value to convert
+ * @param fromUnit - The unit of the input value ('mm', 'inches', 'μm', 'mils')
+ * @param toUnit - The target unit for conversion
+ * @returns The converted value
  */
 export function convertUnit(value: number, fromUnit: string, toUnit: string): number {
   // Conversion factors to mm
   const toMm: Record<string, number> = {
-    'mm': 1,
-    'inches': 25.4,
-    'μm': 0.001,
-    'mils': 0.0254,
+    mm: 1,
+    inches: 25.4,
+    μm: 0.001,
+    mils: 0.0254,
   };
 
   // Convert to mm first, then to target unit
@@ -129,6 +134,12 @@ export function convertUnit(value: number, fromUnit: string, toUnit: string): nu
 
 /**
  * Format value with unit conversion for multi-unit display
+ *
+ * @param value - The value to format (in primary unit)
+ * @param primaryUnit - The primary unit name
+ * @param secondaryUnit - The secondary unit name
+ * @param decimals - Number of decimal places (default: 4)
+ * @returns Formatted string e.g., "25.4000 mm (1.0000 inches)"
  */
 export function formatWithMultiUnit(
   value: number,
@@ -149,10 +160,7 @@ export function formatWithMultiUnit(
  * @param targetBudget - Target tolerance budget
  * @returns Statistical analysis data showing current Cpk and required 3σ for capability targets
  */
-export function calculateStatisticalAnalysis(
-  rssValue: number,
-  targetBudget: number
-) {
+export function calculateStatisticalAnalysis(rssValue: number, targetBudget: number) {
   // RSS result is 3σ (since input tolerances are 3σ)
   const current3Sigma = rssValue;
 
@@ -198,8 +206,9 @@ export function normalCDF(z: number): number {
   // For positive z-scores, use approximation
   if (z >= 0) {
     const t = 1 / (1 + 0.2316419 * z);
-    const d = 0.3989423 * Math.exp(-z * z / 2);
-    const prob = 1 - d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+    const d = 0.3989423 * Math.exp((-z * z) / 2);
+    const prob =
+      1 - d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
     return prob;
   } else {
     // For negative z-scores, use symmetry

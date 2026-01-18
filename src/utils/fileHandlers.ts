@@ -47,7 +47,8 @@ export function importFromJSON(file: File): Promise<ProjectData> {
             secondaryUnit: data.analysisSettings?.secondaryUnit,
             monteCarloSettings: {
               iterations: data.analysisSettings?.monteCarloSettings?.iterations || 50000,
-              useAdvancedDistributions: data.analysisSettings?.monteCarloSettings?.useAdvancedDistributions || false,
+              useAdvancedDistributions:
+                data.analysisSettings?.monteCarloSettings?.useAdvancedDistributions || false,
             },
           },
           directions: data.directions.map((dir) => {
@@ -56,7 +57,12 @@ export function importFromJSON(file: File): Promise<ProjectData> {
             let lsl = dir.lsl;
 
             // If old targetBudget exists but no USL/LSL, convert it
-            if (dir.targetBudget !== undefined && dir.targetBudget > 0 && usl === undefined && lsl === undefined) {
+            if (
+              dir.targetBudget !== undefined &&
+              dir.targetBudget > 0 &&
+              usl === undefined &&
+              lsl === undefined
+            ) {
               usl = dir.targetBudget;
               lsl = -dir.targetBudget;
             }
@@ -68,19 +74,22 @@ export function importFromJSON(file: File): Promise<ProjectData> {
               lsl: lsl || undefined,
               // Keep targetBudget for backward compatibility in the data structure
               items: dir.items.map((item) => ({
-              ...item,
-              // Backward compatibility: default nominal to 0 if not present
-              nominal: item.nominal !== undefined ? item.nominal : 0,
-              // Ensure tolerances are non-negative
-              tolerancePlus: Math.max(0, item.tolerancePlus || 0),
-              toleranceMinus: Math.max(0, item.toleranceMinus || 0),
-              // Migrate isFloat (boolean) to floatFactor (number)
-              floatFactor: item.floatFactor !== undefined
-                ? item.floatFactor
-                : (item.isFloat ? Math.sqrt(3) : 1.0),
-              notes: item.notes || undefined, // Optional field
-              source: item.source || undefined, // Optional field
-            })),
+                ...item,
+                // Backward compatibility: default nominal to 0 if not present
+                nominal: item.nominal !== undefined ? item.nominal : 0,
+                // Ensure tolerances are non-negative
+                tolerancePlus: Math.max(0, item.tolerancePlus || 0),
+                toleranceMinus: Math.max(0, item.toleranceMinus || 0),
+                // Migrate isFloat (boolean) to floatFactor (number)
+                floatFactor:
+                  item.floatFactor !== undefined
+                    ? item.floatFactor
+                    : item.isFloat
+                      ? Math.sqrt(3)
+                      : 1.0,
+                notes: item.notes || undefined, // Optional field
+                source: item.source || undefined, // Optional field
+              })),
             };
           }),
         };
@@ -136,13 +145,15 @@ export function exportToCSV(data: ProjectData, filename: string = 'rss-calculati
     if (data.toleranceMode === 'symmetric') {
       csvContent += 'Item Name,Tolerance (±),Float (√3),Contribution,Source,Notes\n';
     } else {
-      csvContent += 'Item Name,Tolerance (+),Tolerance (-),Float (√3),Contribution (+),Contribution (-),Source,Notes\n';
+      csvContent +=
+        'Item Name,Tolerance (+),Tolerance (-),Float (√3),Contribution (+),Contribution (-),Source,Notes\n';
     }
 
     // Calculate RSS for this stack
-    const rssResult = direction.items.length > 0
-      ? calculateRSS(direction.items, direction.id, direction.name)
-      : null;
+    const rssResult =
+      direction.items.length > 0
+        ? calculateRSS(direction.items, direction.id, direction.name)
+        : null;
 
     // Items data
     direction.items.forEach((item) => {
