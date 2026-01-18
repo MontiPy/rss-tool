@@ -18,3 +18,7 @@ export { useAutoSave } from './useAutoSave';
 export { useKeyboardShortcuts, COMMON_SHORTCUTS } from './useKeyboardShortcuts';
 
 export { useUndoRedo } from './useUndoRedo';
+
+export { useMonteCarloWorker } from './useMonteCarloWorker';
+
+export { useThemeMode } from './useTheme';
