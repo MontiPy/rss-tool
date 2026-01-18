@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box, Grid, TextField, Button } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
@@ -31,9 +31,13 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [diagramOpen, setDiagramOpen] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+  const monteCarloRunId = useRef(0);
 
   // Recalculate whenever items or calculation mode changes
   useEffect(() => {
+    let cancelled = false;
+    let timeoutId: number | undefined;
+
     if (direction.items.length > 0) {
       // Monte Carlo mode
       if (calculationMode === 'monteCarlo') {
@@ -46,7 +50,9 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
         setIsCalculating(true);
 
         // Defer calculation to allow UI update
-        setTimeout(() => {
+        const runId = ++monteCarloRunId.current;
+        timeoutId = window.setTimeout(() => {
+          if (cancelled || runId !== monteCarloRunId.current) return;
           const mcResult = runMonteCarloSimulation(
             direction.items,
             direction.id,
@@ -56,6 +62,7 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
             direction.lsl
           );
 
+          if (cancelled || runId !== monteCarloRunId.current) return;
           // Wrap in RSSResult structure for compatibility
           // For bilateral distribution, use 3σ (99.7% confidence) as representative value
           const threeSigma = 3 * mcResult.percentiles.stdDev;
@@ -79,20 +86,36 @@ const DirectionTab: React.FC<DirectionTabProps> = ({
         // RSS or Worst-Case mode (existing code)
         const result = calculateTolerance(direction.items, direction.id, direction.name, calculationMode);
 
-        // Add statistical analysis if USL exists
-        if (direction.usl && direction.usl > 0 && calculationMode === 'rss') {
-          const statistical = calculateStatisticalAnalysis(
-            result.totalPlus,
-            direction.usl
-          );
-          result.statistical = statistical;
+        // Add statistical analysis if any spec limit exists
+        if (calculationMode === 'rss') {
+          const limits = [direction.usl, direction.lsl]
+            .filter((value): value is number => value !== undefined)
+            .map((value) => Math.abs(value));
+          const targetBudget = limits.length > 0 ? Math.min(...limits) : undefined;
+
+          if (targetBudget !== undefined && targetBudget > 0) {
+            const statistical = calculateStatisticalAnalysis(
+              result.totalPlus,
+              targetBudget
+            );
+            result.statistical = statistical;
+          }
         }
 
         setRssResult(result);
+        setIsCalculating(false);
       }
     } else {
       setRssResult(null);
+      setIsCalculating(false);
     }
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [direction, calculationMode, analysisSettings]);
 
   const handleItemsChange = (items: typeof direction.items) => {

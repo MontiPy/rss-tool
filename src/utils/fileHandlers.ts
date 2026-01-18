@@ -64,8 +64,8 @@ export function importFromJSON(file: File): Promise<ProjectData> {
             return {
               ...dir,
               description: dir.description || undefined, // Optional field
-              usl: usl || undefined,
-              lsl: lsl || undefined,
+              usl: usl ?? undefined,
+              lsl: lsl ?? undefined,
               // Keep targetBudget for backward compatibility in the data structure
               items: dir.items.map((item) => ({
               ...item,
@@ -134,9 +134,9 @@ export function exportToCSV(data: ProjectData, filename: string = 'rss-calculati
 
     // Items table header
     if (data.toleranceMode === 'symmetric') {
-      csvContent += 'Item Name,Tolerance (±),Float (√3),Contribution,Source,Notes\n';
+      csvContent += 'Item Name,Tolerance (±),Float Factor,Contribution,Source,Notes\n';
     } else {
-      csvContent += 'Item Name,Tolerance (+),Tolerance (-),Float (√3),Contribution (+),Contribution (-),Source,Notes\n';
+      csvContent += 'Item Name,Tolerance (+),Tolerance (-),Float Factor,Contribution (+),Contribution (-),Source,Notes\n';
     }
 
     // Calculate RSS for this stack
@@ -146,7 +146,9 @@ export function exportToCSV(data: ProjectData, filename: string = 'rss-calculati
 
     // Items data
     direction.items.forEach((item) => {
-      const floatFactor = item.isFloat ? Math.sqrt(3) : 1.0;
+      const floatFactor = item.floatFactor !== undefined
+        ? item.floatFactor
+        : (item.isFloat ? Math.sqrt(3) : 1.0);
       const escapeCsv = (str: string | undefined) => {
         if (!str) return '';
         // Escape double quotes and wrap in quotes if contains comma or newline
@@ -160,7 +162,7 @@ export function exportToCSV(data: ProjectData, filename: string = 'rss-calculati
         const contribution = item.tolerancePlus * floatFactor;
         csvContent += `${escapeCsv(item.name)},`;
         csvContent += `${item.tolerancePlus},`;
-        csvContent += `${item.isFloat ? 'Yes' : 'No'},`;
+        csvContent += `${floatFactor.toFixed(4)},`;
         csvContent += `${contribution.toFixed(4)},`;
         csvContent += `${escapeCsv(item.source)},`;
         csvContent += `${escapeCsv(item.notes)}\n`;
@@ -170,7 +172,7 @@ export function exportToCSV(data: ProjectData, filename: string = 'rss-calculati
         csvContent += `${escapeCsv(item.name)},`;
         csvContent += `${item.tolerancePlus},`;
         csvContent += `${item.toleranceMinus},`;
-        csvContent += `${item.isFloat ? 'Yes' : 'No'},`;
+        csvContent += `${floatFactor.toFixed(4)},`;
         csvContent += `${contributionPlus.toFixed(4)},`;
         csvContent += `${contributionMinus.toFixed(4)},`;
         csvContent += `${escapeCsv(item.source)},`;

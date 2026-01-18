@@ -217,6 +217,7 @@ export function normalCDF(z: number): number {
  * @returns The probability density at x
  */
 export function normalPdf(x: number, mean: number, std: number): number {
+  if (std === 0) return 0;
   const z = (x - mean) / std;
   return Math.exp(-0.5 * z * z) / (std * Math.sqrt(2 * Math.PI));
 }
@@ -247,6 +248,41 @@ export function generateRSSDistribution(
   // Center distribution on target nominal
   const mean = targetNominal;
   const stdDev = rssTotal / 3;
+
+  if (stdDev === 0 || !Number.isFinite(stdDev)) {
+    let minX = customMinX ?? mean - 1;
+    let maxX = customMaxX ?? mean + 1;
+    if (minX === maxX) {
+      minX = mean - 1;
+      maxX = mean + 1;
+    }
+
+    let riskAnalysis;
+    if (usl !== undefined || lsl !== undefined) {
+      const probExceedingUSL = usl !== undefined ? (mean > usl ? 1 : 0) : 0;
+      const probExceedingLSL = lsl !== undefined ? (mean < lsl ? 1 : 0) : 0;
+      const probOutOfSpec = probExceedingUSL + probExceedingLSL;
+      const expectedDefectRate = probOutOfSpec * 1_000_000;
+
+      riskAnalysis = {
+        usl,
+        lsl,
+        probabilityExceedingUSL: probExceedingUSL,
+        probabilityExceedingLSL: probExceedingLSL,
+        probabilityOutOfSpec: probOutOfSpec,
+        expectedDefectRate: expectedDefectRate,
+      };
+    }
+
+    return {
+      mean,
+      stdDev: 0,
+      curveData: [{ x: mean, pdf: 0 }],
+      riskAnalysis,
+      minX,
+      maxX,
+    };
+  }
 
   // Calculate the range to display
   let minX: number;

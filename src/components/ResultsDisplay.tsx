@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Paper,
   Typography,
@@ -118,6 +118,12 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
       max = Math.max(max, uslExtended);
     }
 
+    if (min === max) {
+      const padding = Math.max(1, Math.abs(targetNominal) * 0.01);
+      min -= padding;
+      max += padding;
+    }
+
     return { min, max };
   };
 
@@ -215,56 +221,78 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
     return `${value.toFixed(4)} ${unit}`;
   };
 
-  // Specification limit comparison logic
-  const hasUSL = usl !== undefined;
-  const hasLSL = lsl !== undefined;
-  const hasLimits = hasUSL || hasLSL;
+  const {
+    hasUSL,
+    hasLSL,
+    hasLimits,
+    uslUtilization,
+    lslUtilization,
+    exceedsUSL,
+    exceedsLSL,
+  } = useMemo(() => {
+    const hasUSLValue = usl !== undefined;
+    const hasLSLValue = lsl !== undefined;
+    let specStatusValue: 'pass' | 'warning' | 'fail' = 'pass';
+    let uslUtilizationValue = 0;
+    let lslUtilizationValue = 0;
+    let exceedsUSLValue = false;
+    let exceedsLSLValue = false;
 
-  let specStatus: 'pass' | 'warning' | 'fail' = 'pass';
-  let uslUtilization = 0;
-  let lslUtilization = 0;
-  let exceedsUSL = false;
-  let exceedsLSL = false;
-
-  if (hasUSL) {
-    const uslMagnitude = Math.abs(usl!);
-    uslUtilization = (totalPlus / uslMagnitude) * 100;
-    exceedsUSL = totalPlus > uslMagnitude;
-    if (uslUtilization > 100) {
-      specStatus = 'fail';
-    } else if (uslUtilization > 90) {
-      specStatus = 'warning';
+    if (hasUSLValue) {
+      const uslMagnitude = Math.abs(usl!);
+      uslUtilizationValue = uslMagnitude === 0 ? 0 : (totalPlus / uslMagnitude) * 100;
+      exceedsUSLValue = totalPlus > uslMagnitude;
+      if (uslUtilizationValue > 100) {
+        specStatusValue = 'fail';
+      } else if (uslUtilizationValue > 90) {
+        specStatusValue = 'warning';
+      }
     }
-  }
 
-  if (hasLSL) {
-    const lslMagnitude = Math.abs(lsl!);
-    lslUtilization = (totalMinus / lslMagnitude) * 100;
-    exceedsLSL = totalMinus > lslMagnitude;
-    if (lslUtilization > 100) {
-      specStatus = 'fail';
-    } else if (lslUtilization > 90 && specStatus === 'pass') {
-      specStatus = 'warning';
+    if (hasLSLValue) {
+      const lslMagnitude = Math.abs(lsl!);
+      lslUtilizationValue = lslMagnitude === 0 ? 0 : (totalMinus / lslMagnitude) * 100;
+      exceedsLSLValue = totalMinus > lslMagnitude;
+      if (lslUtilizationValue > 100) {
+        specStatusValue = 'fail';
+      } else if (lslUtilizationValue > 90 && specStatusValue === 'pass') {
+        specStatusValue = 'warning';
+      }
     }
-  }
+
+    return {
+      hasUSL: hasUSLValue,
+      hasLSL: hasLSLValue,
+      hasLimits: hasUSLValue || hasLSLValue,
+      specStatus: specStatusValue,
+      uslUtilization: uslUtilizationValue,
+      lslUtilization: lslUtilizationValue,
+      exceedsUSL: exceedsUSLValue,
+      exceedsLSL: exceedsLSLValue,
+    };
+  }, [lsl, totalMinus, totalPlus, usl]);
 
   // Calculate percentage contributions and sort by size
-  // Sum of all contributions (not RSS total) for percentage calculation
-  const sumOfContributionsPlus = itemContributions.reduce((sum, c) => sum + c.contributionPlus, 0);
-  const sumOfContributionsMinus = itemContributions.reduce((sum, c) => sum + c.contributionMinus, 0);
+  const contributionsWithPercent = useMemo(() => {
+    const sumOfContributionsPlus = itemContributions.reduce((sum, c) => sum + c.contributionPlus, 0);
+    const sumOfContributionsMinus = itemContributions.reduce((sum, c) => sum + c.contributionMinus, 0);
 
-  const contributionsWithPercent = itemContributions.map((contribution) => {
-    const percentPlus = sumOfContributionsPlus > 0 ? (contribution.contributionPlus / sumOfContributionsPlus) * 100 : 0;
-    const percentMinus = sumOfContributionsMinus > 0 ? (contribution.contributionMinus / sumOfContributionsMinus) * 100 : 0;
-    return {
-      ...contribution,
-      percentPlus,
-      percentMinus,
-    };
-  }).sort((a, b) => b.percentPlus - a.percentPlus); // Sort by largest contribution first
+    return itemContributions.map((contribution) => {
+      const percentPlus = sumOfContributionsPlus > 0 ? (contribution.contributionPlus / sumOfContributionsPlus) * 100 : 0;
+      const percentMinus = sumOfContributionsMinus > 0 ? (contribution.contributionMinus / sumOfContributionsMinus) * 100 : 0;
+      return {
+        ...contribution,
+        percentPlus,
+        percentMinus,
+      };
+    }).sort((a, b) => b.percentPlus - a.percentPlus);
+  }, [itemContributions]);
 
   // Find the maximum percentage for scaling the bars
-  const maxPercent = Math.max(...contributionsWithPercent.map((c) => c.percentPlus));
+  const maxPercent = useMemo(() => {
+    const maxValue = Math.max(0, ...contributionsWithPercent.map((c) => c.percentPlus));
+    return maxValue > 0 ? maxValue : 1;
+  }, [contributionsWithPercent]);
 
   return (
     <Paper elevation={0} variant="outlined" sx={{ p: 2 }}>

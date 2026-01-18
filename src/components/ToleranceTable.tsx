@@ -144,7 +144,7 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
               )}
               {calculationMode !== 'monteCarlo' && (
                 <TableCell align="center">
-                  <strong>Float (√3)</strong>
+                  <strong>Float Factor</strong>
                 </TableCell>
               )}
               {calculationMode === 'monteCarlo' && useAdvancedDistributions && (
@@ -214,7 +214,7 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                   <TableCell align="center">
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                       <Checkbox
-                        checked={item.floatFactor > 1.5}
+                        checked={Math.abs(item.floatFactor - FLOAT_FACTORS.SQRT3) < 0.01}
                         onChange={(e) => handleItemChange(
                           item.id,
                           'floatFactor',
@@ -222,9 +222,17 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                         )}
                         size="small"
                       />
-                      <Typography variant="caption" color="text.secondary">
-                        {item.floatFactor > 1.5 ? `(${FLOAT_FACTORS.SQRT3.toFixed(3)})` : '(1.0)'}
-                      </Typography>
+                      <TextField
+                        type="number"
+                        value={Number.isFinite(item.floatFactor) ? item.floatFactor : FLOAT_FACTORS.FIXED}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value);
+                          handleItemChange(item.id, 'floatFactor', Number.isFinite(value) ? Math.max(0, value) : 0);
+                        }}
+                        size="small"
+                        inputProps={{ step: 0.001, min: 0 }}
+                        sx={{ width: 90, '& input': { fontFamily: MONOSPACE_FONT, textAlign: 'right' } }}
+                      />
                     </Box>
                   </TableCell>
                 )}

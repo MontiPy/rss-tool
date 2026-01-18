@@ -15,6 +15,7 @@ function generateNormal(mean: number, stdDev: number): number {
  * Generate random sample from uniform distribution
  */
 function generateUniform(min: number, max: number): number {
+  if (min === max) return min;
   return min + Math.random() * (max - min);
 }
 
@@ -23,6 +24,7 @@ function generateUniform(min: number, max: number): number {
  * Mode is at center: (min + max) / 2
  */
 function generateTriangular(min: number, max: number): number {
+  if (min === max) return min;
   const u = Math.random();
   const mode = (min + max) / 2;
   const fc = (mode - min) / (max - min);
@@ -55,30 +57,36 @@ function getDistributionType(item: ToleranceItem, useAdvanced: boolean): Distrib
  */
 function sampleTolerance(
   item: ToleranceItem,
-  distributionType: DistributionType,
-  isPlus: boolean
+  distributionType: DistributionType
 ): number {
-  const tolerance = isPlus ? item.tolerancePlus : item.toleranceMinus;
+  const tolerancePlus = Math.max(0, item.tolerancePlus);
+  const toleranceMinus = Math.max(0, item.toleranceMinus);
 
-  if (tolerance === 0) return 0;
+  if (tolerancePlus === 0 && toleranceMinus === 0) return 0;
 
   switch (distributionType) {
-    case 'normal':
-      // Assume tolerance is 3σ, so σ = tolerance/3
-      // Sample from N(0, σ) - can be positive or negative
-      const sigma = tolerance / 3;
-      return generateNormal(0, sigma);
+    case 'normal': {
+      // Split-normal distribution: different sigma for + and - sides
+      const sigmaPlus = tolerancePlus / 3;
+      const sigmaMinus = toleranceMinus / 3;
+      const sigmaSum = sigmaPlus + sigmaMinus;
+      const probabilityPositive = sigmaSum > 0 ? sigmaPlus / sigmaSum : 0.5;
+      const magnitude = Math.abs(generateNormal(0, 1));
+      const sign = Math.random() < probabilityPositive ? 1 : -1;
+      const sigma = sign > 0 ? sigmaPlus : sigmaMinus;
+      return magnitude * sigma * sign;
+    }
 
     case 'uniform':
-      // Sample uniformly between -tolerance and +tolerance
-      return generateUniform(-tolerance, tolerance);
+      // Sample uniformly between -toleranceMinus and +tolerancePlus
+      return generateUniform(-toleranceMinus, tolerancePlus);
 
     case 'triangular':
-      // Triangular from -tolerance to +tolerance, mode at 0
-      return generateTriangular(-tolerance, tolerance);
+      // Triangular from -toleranceMinus to +tolerancePlus, mode at 0
+      return generateTriangular(-toleranceMinus, tolerancePlus);
 
     default:
-      return tolerance;
+      return 0;
   }
 }
 
@@ -90,6 +98,15 @@ function createHistogram(samples: number[], numBins: number): HistogramBin[] {
 
   const min = Math.min(...samples);
   const max = Math.max(...samples);
+  if (min === max) {
+    return [{
+      binStart: min,
+      binEnd: max,
+      binCenter: min,
+      count: samples.length,
+      frequency: 1,
+    }];
+  }
   const binWidth = (max - min) / numBins;
 
   const bins: HistogramBin[] = Array.from({ length: numBins }, (_, i) => ({
@@ -168,7 +185,7 @@ export function runMonteCarloSimulation(
       const distributionType = getDistributionType(item, useAdvancedDistributions);
 
       // Sample tolerance value (signed deviation from nominal)
-      const sampledTolerance = sampleTolerance(item, distributionType, true);
+      const sampledTolerance = sampleTolerance(item, distributionType);
 
       // Store sample for item histogram
       itemSamplesMap.get(item.id)!.push(sampledTolerance);

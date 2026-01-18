@@ -26,6 +26,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import Papa from 'papaparse';
 import { ToleranceItem } from '../types';
 import { FLOAT_FACTORS } from '../utils/rssCalculator';
 
@@ -73,101 +74,73 @@ const CSVImportDialog: React.FC<CSVImportDialogProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const lines = text.split(/\r?\n/).filter((line) => line.trim());
+    Papa.parse<string[]>(file, {
+      skipEmptyLines: 'greedy',
+      complete: (results) => {
+        try {
+          const parsedData = results.data
+            .filter((row) => Array.isArray(row) && row.some((cell) => String(cell).trim() !== ''))
+            .map((row) => row.map((cell) => (cell ?? '').toString().trim()));
 
-        if (lines.length < 2) {
-          setError('CSV file must contain at least a header row and one data row');
-          return;
-        }
-
-        // Parse CSV (simple parser, handles quoted fields)
-        const parsedData = lines.map((line) => {
-          const cells: string[] = [];
-          let cell = '';
-          let insideQuotes = false;
-
-          for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            const nextChar = line[i + 1];
-
-            if (char === '"') {
-              if (insideQuotes && nextChar === '"') {
-                cell += '"';
-                i++; // Skip next quote
-              } else {
-                insideQuotes = !insideQuotes;
-              }
-            } else if (char === ',' && !insideQuotes) {
-              cells.push(cell.trim());
-              cell = '';
-            } else {
-              cell += char;
-            }
+          if (parsedData.length < 2) {
+            setError('CSV file must contain at least a header row and one data row');
+            return;
           }
-          cells.push(cell.trim());
-          return cells;
-        });
 
-        const headerRow = parsedData[0];
-        const dataRows = parsedData.slice(1);
+          const headerRow = parsedData[0];
+          const dataRows = parsedData.slice(1);
 
-        setHeaders(headerRow);
-        setCsvData(dataRows);
-        setError('');
+          setHeaders(headerRow);
+          setCsvData(dataRows);
+          setError('');
 
-        // Auto-detect column mappings based on common header names
-        const autoMapping: ColumnMapping = {
-          name: '',
-          nominal: '',
-          tolerancePlus: '',
-          toleranceMinus: '',
-          floatFactor: '',
-          notes: '',
-          source: '',
-        };
+          // Auto-detect column mappings based on common header names
+          const autoMapping: ColumnMapping = {
+            name: '',
+            nominal: '',
+            tolerancePlus: '',
+            toleranceMinus: '',
+            floatFactor: '',
+            notes: '',
+            source: '',
+          };
 
-        headerRow.forEach((header, index) => {
-          const normalized = header.toLowerCase().trim();
+          headerRow.forEach((header, index) => {
+            const normalized = header.toLowerCase().trim();
 
-          if (normalized.includes('name') || normalized.includes('item') || normalized.includes('description')) {
-            autoMapping.name = index.toString();
-          } else if (normalized.includes('nominal') || normalized === 'nom') {
-            autoMapping.nominal = index.toString();
-          } else if (normalized.includes('tolerance') && (normalized.includes('+') || normalized.includes('plus') || normalized.includes('positive'))) {
-            autoMapping.tolerancePlus = index.toString();
-          } else if (normalized.includes('tolerance') && (normalized.includes('-') || normalized.includes('minus') || normalized.includes('negative'))) {
-            autoMapping.toleranceMinus = index.toString();
-          } else if (normalized.includes('tolerance') && !autoMapping.tolerancePlus) {
-            // If just "tolerance", use for plus (and minus in symmetric mode)
-            autoMapping.tolerancePlus = index.toString();
-            if (isSymmetricMode) {
+            if (normalized.includes('name') || normalized.includes('item') || normalized.includes('description')) {
+              autoMapping.name = index.toString();
+            } else if (normalized.includes('nominal') || normalized === 'nom') {
+              autoMapping.nominal = index.toString();
+            } else if (normalized.includes('tolerance') && (normalized.includes('+') || normalized.includes('plus') || normalized.includes('positive'))) {
+              autoMapping.tolerancePlus = index.toString();
+            } else if (normalized.includes('tolerance') && (normalized.includes('-') || normalized.includes('minus') || normalized.includes('negative'))) {
               autoMapping.toleranceMinus = index.toString();
+            } else if (normalized.includes('tolerance') && !autoMapping.tolerancePlus) {
+              // If just "tolerance", use for plus (and minus in symmetric mode)
+              autoMapping.tolerancePlus = index.toString();
+              if (isSymmetricMode) {
+                autoMapping.toleranceMinus = index.toString();
+              }
+            } else if (normalized.includes('float') || normalized.includes('factor')) {
+              autoMapping.floatFactor = index.toString();
+            } else if (normalized.includes('note')) {
+              autoMapping.notes = index.toString();
+            } else if (normalized.includes('source') || normalized.includes('reference') || normalized.includes('dwg')) {
+              autoMapping.source = index.toString();
             }
-          } else if (normalized.includes('float') || normalized.includes('factor')) {
-            autoMapping.floatFactor = index.toString();
-          } else if (normalized.includes('note')) {
-            autoMapping.notes = index.toString();
-          } else if (normalized.includes('source') || normalized.includes('reference') || normalized.includes('dwg')) {
-            autoMapping.source = index.toString();
-          }
-        });
+          });
 
-        setColumnMapping(autoMapping);
-        setActiveStep(1);
-      } catch (err) {
-        setError('Failed to parse CSV file: ' + (err as Error).message);
-      }
-    };
-
-    reader.onerror = () => {
-      setError('Failed to read file');
-    };
-
-    reader.readAsText(file);
+          setColumnMapping(autoMapping);
+          setActiveStep(1);
+        } catch (err) {
+          setError('Failed to parse CSV file: ' + (err as Error).message);
+        }
+      },
+      error: (error) => {
+        setError('Failed to parse CSV file: ' + error.message);
+      },
+    });
 
     // Reset file input
     event.target.value = '';
