@@ -23,7 +23,11 @@ import {
   Switch,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { ProjectMetadata, ToleranceUnit, AnalysisSettings } from '../types';
+import { ProjectMetadata, ToleranceUnit, AnalysisSettings, MonteCarloSettings } from '../types';
+import { DEFAULT_ANALYSIS_SETTINGS } from '../utils/projectDefaults';
+import NumericField from './NumericField';
+
+const ITERATION_PRESETS: Record<string, number> = { '10k': 10000, '50k': 50000, '100k': 100000 };
 
 interface ProjectMetadataEditorProps {
   open: boolean;
@@ -31,7 +35,12 @@ interface ProjectMetadataEditorProps {
   unit: ToleranceUnit;
   analysisSettings: AnalysisSettings;
   onClose: () => void;
-  onSave: (metadata: ProjectMetadata, unit: ToleranceUnit, analysisSettings: AnalysisSettings) => void;
+  onSave: (
+    metadata: ProjectMetadata,
+    unit: ToleranceUnit,
+    analysisSettings: AnalysisSettings,
+    convertValues: boolean
+  ) => void;
 }
 
 const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
@@ -45,6 +54,8 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
   const [editedMetadata, setEditedMetadata] = useState<ProjectMetadata>(metadata);
   const [selectedUnit, setSelectedUnit] = useState<ToleranceUnit>(unit);
   const [editedSettings, setEditedSettings] = useState<AnalysisSettings>(analysisSettings);
+  const [customIterations, setCustomIterations] = useState(false);
+  const [convertValues, setConvertValues] = useState(true);
 
   // Sync local state when props change (e.g., after loading a file)
   useEffect(() => {
@@ -52,8 +63,24 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
       setEditedMetadata(metadata);
       setSelectedUnit(unit);
       setEditedSettings(analysisSettings);
+      setCustomIterations(false);
+      setConvertValues(true);
     }
   }, [open, metadata, unit, analysisSettings]);
+
+  const mcSettings: MonteCarloSettings = {
+    ...DEFAULT_ANALYSIS_SETTINGS.monteCarloSettings!,
+    ...editedSettings.monteCarloSettings,
+  };
+  const presetKey = Object.keys(ITERATION_PRESETS).find((k) => ITERATION_PRESETS[k] === mcSettings.iterations);
+  const iterationPreset = customIterations || !presetKey ? 'custom' : presetKey;
+
+  const updateMonteCarlo = (changes: Partial<MonteCarloSettings>) => {
+    setEditedSettings({
+      ...editedSettings,
+      monteCarloSettings: { ...mcSettings, ...changes },
+    });
+  };
 
   const handleFieldChange = (field: keyof ProjectMetadata, value: string) => {
     setEditedMetadata({
@@ -70,7 +97,15 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
       // Set created date if this is a new project
       createdDate: editedMetadata.createdDate || new Date().toISOString(),
     };
-    onSave(finalMetadata, selectedUnit, editedSettings);
+    const finalSettings: AnalysisSettings = {
+      ...editedSettings,
+      // Monte Carlo mode is hidden when the feature is disabled, so fall back to RSS
+      calculationMode:
+        !editedSettings.enableMonteCarlo && editedSettings.calculationMode === 'monteCarlo'
+          ? 'rss'
+          : editedSettings.calculationMode,
+    };
+    onSave(finalMetadata, selectedUnit, finalSettings, selectedUnit !== unit && convertValues);
     onClose();
   };
 
@@ -142,6 +177,23 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
                 <MenuItem value="mils">Mils (0.001 in)</MenuItem>
               </Select>
             </FormControl>
+            {selectedUnit !== unit && (
+              <FormControlLabel
+                sx={{ mt: 0.5 }}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={convertValues}
+                    onChange={(e) => setConvertValues(e.target.checked)}
+                  />
+                }
+                label={
+                  <Typography variant="caption">
+                    Convert all values from {unit} to {selectedUnit} (otherwise only the label changes)
+                  </Typography>
+                }
+              />
+            )}
           </Grid>
 
           <Grid item xs={12} sm={6}>
@@ -240,36 +292,32 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
           )}
 
           <Grid item xs={12} sm={6}>
-            <TextField
+            <NumericField
               label="Sensitivity Analysis Increment"
               value={editedSettings.sensitivityIncrement || 0.1}
-              onChange={(e) =>
-                setEditedSettings({
-                  ...editedSettings,
-                  sensitivityIncrement: parseFloat(e.target.value) || 0.1,
-                })
+              onChange={(value) =>
+                setEditedSettings({ ...editedSettings, sensitivityIncrement: value || 0.1 })
               }
+              commitOnBlur
               fullWidth
-              type="number"
-              inputProps={{ step: 0.01, min: 0.001 }}
+              min={0.0001}
+              step={0.01}
               helperText="Increment step for sensitivity sliders"
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
-            <TextField
+            <NumericField
               label="Contribution Threshold (%)"
-              value={editedSettings.contributionThreshold || 40}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value) || 40;
-                setEditedSettings({
-                  ...editedSettings,
-                  contributionThreshold: Math.max(0, Math.min(100, value)),
-                });
-              }}
+              value={editedSettings.contributionThreshold ?? 40}
+              onChange={(value) =>
+                setEditedSettings({ ...editedSettings, contributionThreshold: value ?? 40 })
+              }
+              commitOnBlur
               fullWidth
-              type="number"
-              inputProps={{ step: 1, min: 0, max: 100 }}
+              min={0}
+              max={100}
+              step={1}
               helperText="Percentage threshold for high-impact item warnings (default: 40%)"
             />
           </Grid>
@@ -310,25 +358,12 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
             <FormControl fullWidth>
               <FormLabel>Default Iterations</FormLabel>
               <RadioGroup
-                value={
-                  editedSettings.monteCarloSettings?.iterations === 10000 ? '10k' :
-                  editedSettings.monteCarloSettings?.iterations === 100000 ? '100k' :
-                  editedSettings.monteCarloSettings?.iterations === 50000 ? '50k' :
-                  'custom'
-                }
+                value={iterationPreset}
                 onChange={(e) => {
                   const value = e.target.value;
-                  const iterations = value === '10k' ? 10000 :
-                                    value === '100k' ? 100000 :
-                                    value === '50k' ? 50000 :
-                                    editedSettings.monteCarloSettings?.iterations || 50000;
-                  setEditedSettings({
-                    ...editedSettings,
-                    monteCarloSettings: {
-                      ...(editedSettings.monteCarloSettings || { useAdvancedDistributions: false }),
-                      iterations,
-                    },
-                  });
+                  const preset = ITERATION_PRESETS[value];
+                  setCustomIterations(value === 'custom');
+                  updateMonteCarlo({ iterations: preset ?? mcSettings.iterations });
                 }}
               >
                 <FormControlLabel value="10k" control={<Radio />} label="10,000 (Fast)" />
@@ -339,45 +374,42 @@ const ProjectMetadataEditor: React.FC<ProjectMetadataEditorProps> = ({
             </FormControl>
           </Grid>
 
-          {editedSettings.monteCarloSettings?.iterations !== 10000 &&
-           editedSettings.monteCarloSettings?.iterations !== 50000 &&
-           editedSettings.monteCarloSettings?.iterations !== 100000 && (
-            <Grid item xs={12} sm={6}>
-              <TextField
+          <Grid item xs={12} sm={6}>
+            {iterationPreset === 'custom' && (
+              <NumericField
                 label="Custom Iteration Count"
-                type="number"
                 fullWidth
-                value={editedSettings.monteCarloSettings?.iterations || 50000}
-                onChange={(e) => {
-                  const iterations = Math.max(1000, Math.min(1000000, parseInt(e.target.value) || 50000));
-                  setEditedSettings({
-                    ...editedSettings,
-                    monteCarloSettings: {
-                      ...(editedSettings.monteCarloSettings || { useAdvancedDistributions: false }),
-                      iterations,
-                    },
-                  });
-                }}
-                inputProps={{ min: 1000, max: 1000000, step: 1000 }}
+                value={mcSettings.iterations}
+                onChange={(value) => updateMonteCarlo({ iterations: Math.round(value ?? 50000) })}
+                commitOnBlur
+                min={1000}
+                max={1000000}
+                step={1000}
                 helperText="Range: 1,000 - 1,000,000"
+                sx={{ mb: 2 }}
               />
-            </Grid>
-          )}
+            )}
+            <NumericField
+              label="Random Seed (optional)"
+              fullWidth
+              value={mcSettings.seed}
+              onChange={(value) =>
+                updateMonteCarlo({ seed: value === undefined ? undefined : Math.round(Math.abs(value)) })
+              }
+              allowEmpty
+              commitOnBlur
+              min={0}
+              max={4294967295}
+              helperText="Set a seed to get identical results on every run; leave blank for a new random run each time"
+            />
+          </Grid>
 
           <Grid item xs={12}>
             <FormControlLabel
               control={
                 <Switch
                   checked={editedSettings.monteCarloSettings?.useAdvancedDistributions || false}
-                  onChange={(e) => {
-                    setEditedSettings({
-                      ...editedSettings,
-                      monteCarloSettings: {
-                        ...(editedSettings.monteCarloSettings || { iterations: 50000 }),
-                        useAdvancedDistributions: e.target.checked,
-                      },
-                    });
-                  }}
+                  onChange={(e) => updateMonteCarlo({ useAdvancedDistributions: e.target.checked })}
                 />
               }
               label="Advanced: Per-item distribution selection"

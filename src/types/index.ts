@@ -138,7 +138,7 @@ export interface ProjectMetadata {
 export interface MonteCarloSettings {
   iterations: number; // Number of simulation runs (default: 50000)
   useAdvancedDistributions: boolean; // Allow per-item distribution selection
-  seed?: number; // Optional random seed for reproducibility
+  seed?: number; // Optional random seed for reproducible results (unset = random each run)
 }
 
 /**
@@ -171,16 +171,17 @@ export interface MonteCarloResult {
   directionId: string;
   directionName: string;
   iterations: number;
-  samples: number[]; // Array of RSS results from each iteration
+  seed: number; // Seed used for this run (re-use it to reproduce the result)
   percentiles: PercentileData;
   histogram: HistogramBin[]; // Final stack distribution (50 bins)
   itemHistograms: Map<string, HistogramBin[]>; // Individual item distributions (30 bins each)
+  center: number; // Stack center the samples are offset by (target nominal or Σ nominal)
   itemContributions: {
     itemId: string;
     itemName: string;
     mean: number;
     stdDev: number;
-    percentContribution: number;
+    percentContribution: number; // Share of total variance (0-100)
   }[];
   riskAnalysis?: {
     usl?: number; // Upper Specification Limit
@@ -203,6 +204,35 @@ export interface AnalysisSettings {
   sensitivityIncrement: number; // Increment for sensitivity analysis slider (default: 0.1)
   enableMonteCarlo: boolean; // Enable Monte Carlo simulation mode (advanced feature, default: false)
   monteCarloSettings?: MonteCarloSettings; // Monte Carlo simulation configuration
+}
+
+/**
+ * Process capability analysis for a stack (assumes normal distribution)
+ */
+export interface CapabilityAnalysis {
+  mean: number; // Distribution center (stack center)
+  sigma: number; // 1σ of the stack
+  current3Sigma: number; // Current 3σ result
+  cp?: number; // (USL - LSL) / 6σ, only when both limits exist
+  cpu?: number; // (USL - μ) / 3σ
+  cpl?: number; // (μ - LSL) / 3σ
+  currentCpk: number; // min(Cpu, Cpl)
+  currentYield: number; // Estimated yield percentage (0-100)
+  ppm: number; // Expected defects per million
+  required3SigmaFor1_33Cpk: number; // 3σ needed for Cpk = 1.33 at current centering
+  required3SigmaFor1_66Cpk: number; // 3σ needed for Cpk = 1.66 at current centering
+}
+
+/**
+ * Status of a stack against one specification limit
+ */
+export interface SpecLimitStatus {
+  limit: number; // The limit value
+  margin: number; // Distance from stack center to limit (negative if center is beyond the limit)
+  extreme: number; // Predicted extreme dimension on this side (center ± total)
+  utilization: number; // total / margin × 100 (Infinity when margin <= 0)
+  exceedsBy: number; // How far the extreme goes past the limit (0 when within)
+  status: 'pass' | 'warning' | 'fail';
 }
 
 /**
@@ -231,15 +261,12 @@ export interface RSSResult {
     itemName: string;
     contributionPlus: number;
     contributionMinus: number;
+    // Share of the total (0-100). RSS/Monte Carlo: share of variance; Worst-Case: share of the sum.
+    percentPlus: number;
+    percentMinus: number;
   }[];
-  // Statistical analysis (optional, only shown if targetBudget exists)
-  statistical?: {
-    current3Sigma: number; // Current 3σ RSS result
-    currentCpk: number; // Current process capability
-    currentYield: number; // Estimated yield percentage
-    required3SigmaFor1_33Cpk: number; // 3σ needed for Cpk = 1.33
-    required3SigmaFor1_66Cpk: number; // 3σ needed for Cpk = 1.66
-  };
+  // Statistical analysis (optional, only present in RSS mode when a spec limit is set)
+  statistical?: CapabilityAnalysis;
   // Monte Carlo simulation result (present when calculationMode = 'monteCarlo')
   monteCarloResult?: MonteCarloResult;
 }

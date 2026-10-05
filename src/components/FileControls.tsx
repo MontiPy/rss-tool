@@ -1,150 +1,104 @@
 import React, { useRef } from 'react';
-import { Button, Box, Alert, Snackbar } from '@mui/material';
+import { Button, Box, IconButton, Tooltip, Divider } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import TableChartIcon from '@mui/icons-material/TableChart';
-import { ProjectData } from '../types';
-import { exportToJSON, importFromJSON, exportToCSV } from '../utils/fileHandlers';
+import NoteAddIcon from '@mui/icons-material/NoteAdd';
+import DescriptionIcon from '@mui/icons-material/Description';
+import UndoIcon from '@mui/icons-material/Undo';
+import RedoIcon from '@mui/icons-material/Redo';
 
 interface FileControlsProps {
-  projectData: ProjectData;
-  onLoad: (data: ProjectData) => void;
+  onNew: () => void;
+  onSave: () => void;
+  onLoadFile: (file: File) => void;
+  onExportCSV: () => void;
+  onExportReport: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  hasUnsavedChanges: boolean;
 }
 
-const FileControls: React.FC<FileControlsProps> = ({ projectData, onLoad }) => {
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const mod = isMac ? '⌘' : 'Ctrl+';
+
+const FileControls: React.FC<FileControlsProps> = ({
+  onNew,
+  onSave,
+  onLoadFile,
+  onExportCSV,
+  onExportReport,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  hasUnsavedChanges,
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [snackbar, setSnackbar] = React.useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error';
-  }>({
-    open: false,
-    message: '',
-    severity: 'success',
-  });
 
-  const handleSave = () => {
-    try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `rss-calculation-${timestamp}.json`;
-      exportToJSON(projectData, filename);
-      setSnackbar({
-        open: true,
-        message: 'Project saved successfully!',
-        severity: 'success',
-      });
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: 'Failed to save project: ' + (error as Error).message,
-        severity: 'error',
-      });
-    }
-  };
-
-  const handleExportCSV = () => {
-    try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `rss-calculation-${timestamp}.csv`;
-      exportToCSV(projectData, filename);
-      setSnackbar({
-        open: true,
-        message: 'CSV exported successfully!',
-        severity: 'success',
-      });
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: 'Failed to export CSV: ' + (error as Error).message,
-        severity: 'error',
-      });
-    }
-  };
-
-  const handleLoadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const data = await importFromJSON(file);
-      onLoad(data);
-      setSnackbar({
-        open: true,
-        message: 'Project loaded successfully!',
-        severity: 'success',
-      });
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: 'Failed to load project: ' + (error as Error).message,
-        severity: 'error',
-      });
-    }
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
+    if (file) onLoadFile(file);
+    // Reset so the same file can be loaded again
+    event.target.value = '';
   };
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        <Button
-          variant="contained"
-          startIcon={<SaveIcon />}
-          onClick={handleSave}
-          color="primary"
-          size="small"
-        >
-          Save
+    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Tooltip title={`Undo (${mod}Z)`}>
+        <span>
+          <IconButton size="small" onClick={onUndo} disabled={!canUndo} aria-label="Undo">
+            <UndoIcon fontSize="small" />
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Tooltip title={`Redo (${mod}${isMac ? '⇧Z' : 'Y'})`}>
+        <span>
+          <IconButton size="small" onClick={onRedo} disabled={!canRedo} aria-label="Redo">
+            <RedoIcon fontSize="small" />
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Divider orientation="vertical" flexItem />
+      <Tooltip title="Start a new project">
+        <Button variant="outlined" startIcon={<NoteAddIcon />} onClick={onNew} size="small">
+          New
         </Button>
+      </Tooltip>
+      <Tooltip title={`Save project as JSON (${mod}S)${hasUnsavedChanges ? ' — unsaved changes' : ''}`}>
+        <Button variant="contained" startIcon={<SaveIcon />} onClick={onSave} size="small">
+          Save{hasUnsavedChanges ? ' •' : ''}
+        </Button>
+      </Tooltip>
+      <Tooltip title={`Load project JSON (${mod}O)`}>
         <Button
           variant="outlined"
           startIcon={<FileUploadIcon />}
-          onClick={handleLoadClick}
-          color="primary"
+          onClick={() => fileInputRef.current?.click()}
           size="small"
         >
           Load
         </Button>
-        <Button
-          variant="outlined"
-          startIcon={<TableChartIcon />}
-          onClick={handleExportCSV}
-          color="secondary"
-          size="small"
-        >
-          Export CSV
+      </Tooltip>
+      <Button variant="outlined" startIcon={<TableChartIcon />} onClick={onExportCSV} color="secondary" size="small">
+        Export CSV
+      </Button>
+      <Tooltip title="Printable report with all stacks (save as PDF from the print dialog)">
+        <Button variant="outlined" startIcon={<DescriptionIcon />} onClick={onExportReport} color="secondary" size="small">
+          Report
         </Button>
-      </Box>
+      </Tooltip>
 
       <input
         ref={fileInputRef}
+        id="project-file-input"
         type="file"
-        accept=".json"
+        accept=".json,application/json"
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 };

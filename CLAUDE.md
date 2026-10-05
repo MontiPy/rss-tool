@@ -8,7 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev      # Start development server at http://localhost:5173
 npm run build    # TypeScript check + production build (outputs to dist/)
 npm run preview  # Preview production build locally
+npm test         # Vitest unit tests (src/**/*.test.ts)
 ```
+
+CI (`.github/workflows/ci.yml`) runs `npm test` and `npm run build` on pushes and pull requests.
 
 **Note:** Requires Node.js 18+. If using Node 18, Vite 5.x is compatible. Newer Vite versions may require Node 20+.
 
@@ -18,7 +21,7 @@ This is a React + TypeScript web application for calculating Root Sum Square (RS
 
 ### State Management Pattern
 
-**Centralized state in `App.tsx`** - No external state library (Redux, Zustand). Simple React hooks with callback pattern:
+**Centralized state in `App.tsx`** - No external state library (Redux, Zustand). Project state lives in `useHistoryState` (`src/hooks/useHistoryState.ts`), which adds undo/redo (edits within 600 ms are merged into one step). Always update it with functional updates (`setProjectData(prev => ...)`). It is autosaved to `localStorage` (`rss-tool:autosave`) and restored on startup.
 
 ```
 App.tsx (root state: ProjectData)
@@ -34,7 +37,7 @@ App.tsx (root state: ProjectData)
 1. User edits tolerance in `ToleranceTable`
 2. Callback chain: `handleItemChange` → `onItemsChange` → `handleDirectionChange` → `setProjectData`
 3. State update propagates down to child components
-4. `DirectionTab` useEffect detects change → triggers `calculateRSS()`
+4. `DirectionTab` recomputes RSS/Worst-Case synchronously in a `useMemo` (Monte Carlo runs in a Web Worker)
 5. `ResultsDisplay` shows updated RSS result in real-time (side-by-side layout)
 
 ### UI Layout Pattern
@@ -132,6 +135,10 @@ For each item:
 WC = Σ(contribution)  // Simple sum of all contributions
 ```
 
+**Percent contributions** (`itemContributions[].percentPlus/percentMinus`) are computed by the calculator: variance share `c² / Σc²` in RSS and Monte Carlo modes, linear share `c / Σc` in Worst-Case mode.
+
+**Stack center** (`getStackCenter`): `targetNominal` if set, otherwise Σ item nominals (0 for deviation-only stacks). USL/LSL, the RSS distribution, capability and Monte Carlo samples all use this same coordinate system.
+
 **Critical:**
 - Float factor is multiplied into contribution BEFORE squaring (for RSS), not after calculation
 - This follows standard statistical tolerance stack analysis for floating dimensions
@@ -140,29 +147,10 @@ WC = Σ(contribution)  // Simple sum of all contributions
 
 ### Calculation Trigger
 
-Calculations run automatically via `useEffect` in `DirectionTab.tsx`:
-
-```typescript
-useEffect(() => {
-  if (direction.items.length > 0) {
-    // Calculate based on mode
-    const result = calculateTolerance(direction.items, direction.id, direction.name, calculationMode);
-
-    // Add statistical analysis if USL exists (RSS mode only)
-    if (calculationMode === 'rss' && direction.usl) {
-      result.statistical = calculateStatisticalAnalysis(...);
-    }
-
-    setRssResult(result);
-  }
-}, [direction, calculationMode]);
-```
-
-**Key Points:**
-- **RSS mode:** Runs RSS calculation (deterministic) + generates theoretical distribution on demand in ResultsDisplay
-- **Monte Carlo mode:** Runs Monte Carlo simulation (probabilistic)
-- **Worst-Case mode:** Runs worst-case arithmetic sum
-- **Lazy Calculation:** Only the active tab's direction calculates. Inactive tabs don't recalculate until user switches to them (performance optimization).
+`DirectionTab.tsx`:
+- **RSS / Worst-Case:** `useMemo` over `calculateTolerance()`; in RSS mode `result.statistical = calculateCapability(total, center, usl, lsl)` whenever a limit is set.
+- **Monte Carlo:** debounced (300 ms) `startMonteCarlo()` from `monteCarloRunner.ts`, which runs `runMonteCarloSimulation()` in `monteCarlo.worker.ts` and cancels the previous run when inputs change. Images/notes are stripped before posting to the worker.
+- **Lazy Calculation:** Only the active tab's direction is mounted and calculated.
 - **Distribution visualization in RSS mode** is generated in the UI component using `generateRSSDistribution()` - not computed during calculation
 
 ## File I/O
@@ -173,9 +161,11 @@ useEffect(() => {
 // Export
 exportToJSON(projectData, 'rss-calculation-YYYY-MM-DD.json')
 
-// Import (with basic validation)
-importFromJSON(file)  // Validates toleranceMode & directions exist
+// Import (validated and normalized by parseProjectData / parseProjectJSON)
+importFromJSON(file)
 ```
+
+`parseProjectData()` is the single place that validates untrusted project JSON: it requires a non-empty `directions` array, clamps tolerances to ≥ 0, coerces numbers, keeps limits of 0, de-duplicates IDs, fills defaults, and resets `calculationMode` to `rss` if Monte Carlo is disabled. Add new fields there.
 
 **Example file structure (with all Phase 2 features):**
 ```json
@@ -246,10 +236,12 @@ importFromJSON(file)  // Validates toleranceMode & directions exist
 - Typically USL > LSL (e.g., USL = +10, LSL = -10)
 - When set, ResultsDisplay shows color-coded status for each limit
 
-**Specification Status Logic:**
+**Specification Status Logic** (`evaluateSpecLimit()` in `rssCalculator.ts`):
 ```typescript
-uslUtilization = (totalPlus / |usl|) × 100
-lslUtilization = (totalMinus / |lsl|) × 100
+uslMargin = usl - center;   uslUtilization = totalPlus / uslMargin × 100
+lslMargin = center - lsl;   lslUtilization = totalMinus / lslMargin × 100
+// margin <= 0 (center outside the limit) → utilization = Infinity → fail
+// With center = 0 this is the classic totalPlus / |usl|
 
 Status Colors (checked independently for USL and LSL):
 - Green (Pass):    < 90% of limit magnitude
@@ -343,7 +335,10 @@ Status Colors (checked independently for USL and LSL):
 **Calculation:**
 - Runs N iterations (default: 50,000)
 - Each iteration samples from item distributions, calculates **linear sum** (not RSS)
-- Deviations add algebraically: total = Σ(sampled_deviation × float_factor)
+- Stack value = center + Σ(sampled deviations); USL/LSL are compared in the same coordinates
+- Asymmetric +a/−b: mean shift (a − b)/2, half-width (a + b)/2, so samples stay within [−b, +a]
+- Float factor: in auto mode floating (√3) items are uniform ±t (σ = t/√3, already equal to RSS's √3·t/3, so no extra factor); other items are normal with 3σ = t × floatFactor. In advanced mode the chosen distribution replaces the float factor. This keeps 3σ(MC) ≈ RSS.
+- Seeded PRNG (mulberry32): `monteCarloSettings.seed` makes runs reproducible; the seed used is reported on `MonteCarloResult.seed`
 - Results in **bilateral distribution** (can be positive or negative)
 - Main result shows ±3σ range (99.7% confidence interval)
 - Assumes tolerances represent ±3σ values (σ = tolerance/3 for normal)
@@ -490,7 +485,7 @@ mils:   0.0254     (1 mil = 0.001 inch = 0.0254 mm)
 ## Important Implementation Details
 
 ### ID Generation
-Uses timestamp-based IDs: `Date.now()`. Simple, session-scoped uniqueness. Not cryptographically secure but acceptable for this use case.
+Use `generateId(prefix)` from `projectDefaults.ts` (timestamp + random suffix). Plain `Date.now()` IDs collide when several are created in the same millisecond.
 
 ### Symmetric vs Asymmetric Mode
 - **Symmetric mode:** UI shows single tolerance input (±), enforces `tolerancePlus === toleranceMinus` on change
@@ -776,6 +771,10 @@ Vite provides automatic HMR. Changes to `.tsx` files reload instantly without fu
 
 ## Mathematical Symbols
 
+Numeric inputs should use `NumericField` (keeps raw text while typing, clamps to min/max, ↑/↓ steps) rather than `TextField type="number"` with `parseFloat(...) || 0`.
+
+`MONOSPACE_FONT` and the MUI theme live in `src/theme.ts` (don't import from `App.tsx`; that creates a cycle and defeats code splitting). Dialogs (`HelpDialog`, `ProjectMetadataEditor`, `CSVImportDialog`, `DiagramBuilderDialog`, `SensitivityAnalysisDialog`) are `React.lazy` and only mounted while open.
+
 Use actual Unicode characters in JSX, NOT escape sequences:
 - `±` not `\u00b1`
 - `√` not `\u221A`
@@ -788,7 +787,7 @@ Unicode escapes don't render correctly in JSX strings.
 
 ## Default Values Reference
 
-**New Tolerance Item (ToleranceTable.tsx:60-69):**
+**New Tolerance Item (`createDefaultItem()` in `src/utils/projectDefaults.ts`):**
 ```typescript
 {
   id: `item-${Date.now()}`,
@@ -800,7 +799,7 @@ Unicode escapes don't render correctly in JSX strings.
 }
 ```
 
-**New Analysis Settings (App.tsx:58-68, fileHandlers.ts:41-52):**
+**New Analysis Settings (`DEFAULT_ANALYSIS_SETTINGS` in `src/utils/projectDefaults.ts`):**
 ```typescript
 {
   calculationMode: 'rss',
@@ -821,9 +820,9 @@ Unicode escapes don't render correctly in JSX strings.
 90-100% of limit → Yellow (warning)
 > 100% of limit  → Red (fail)
 
-// Applied independently to both USL and LSL
-// uslUtilization = (totalPlus / usl) × 100
-// lslUtilization = (totalMinus / |lsl|) × 100
+// Applied independently to both USL and LSL, measured from the stack center
+// uslUtilization = totalPlus / (usl - center) × 100
+// lslUtilization = totalMinus / (center - lsl) × 100
 ```
 
 **Constants (rssCalculator.ts):**

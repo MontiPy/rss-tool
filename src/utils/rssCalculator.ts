@@ -1,4 +1,11 @@
-import { ToleranceItem, RSSResult, CalculationMode } from '../types';
+import {
+  ToleranceItem,
+  RSSResult,
+  CalculationMode,
+  CapabilityAnalysis,
+  SpecLimitStatus,
+  ToleranceUnit,
+} from '../types';
 
 /**
  * Common float factors
@@ -9,23 +16,58 @@ export const FLOAT_FACTORS = {
   SQRT3: Math.sqrt(3), // ≈ 1.732
 } as const;
 
-// Backward compatibility
-const FLOAT_FACTOR = FLOAT_FACTORS.SQRT3;
+/**
+ * Conversion factors to millimetres
+ */
+export const UNIT_TO_MM: Record<ToleranceUnit, number> = {
+  mm: 1,
+  inches: 25.4,
+  μm: 0.001,
+  mils: 0.0254,
+};
 
 /**
- * Get the float factor for an item (with backward compatibility)
+ * Utilization thresholds (percent of available margin) for spec limit status
  */
-function getItemFloatFactor(item: ToleranceItem): number {
-  // Use new floatFactor if available
-  if (item.floatFactor !== undefined) {
+export const SPEC_WARNING_THRESHOLD = 90;
+export const SPEC_FAIL_THRESHOLD = 100;
+
+/**
+ * Get the float factor for an item (with backward compatibility for legacy `isFloat`)
+ */
+export function getItemFloatFactor(item: ToleranceItem): number {
+  if (item.floatFactor !== undefined && Number.isFinite(item.floatFactor)) {
     return item.floatFactor;
   }
-  // Backward compatibility: convert isFloat boolean to floatFactor
   if (item.isFloat !== undefined) {
-    return item.isFloat ? FLOAT_FACTOR : 1;
+    return item.isFloat ? FLOAT_FACTORS.SQRT3 : FLOAT_FACTORS.FIXED;
   }
-  // Default to fixed (1.0)
-  return 1;
+  return FLOAT_FACTORS.FIXED;
+}
+
+/**
+ * Whether an item uses a floating (> 1.0) float factor
+ */
+export function isFloatingItem(item: ToleranceItem): boolean {
+  return getItemFloatFactor(item) > 1.5;
+}
+
+/**
+ * Sum of item nominal values (the predicted nominal of the stack)
+ */
+export function getStackNominal(items: ToleranceItem[]): number {
+  return items.reduce((sum, item) => sum + (item.nominal || 0), 0);
+}
+
+/**
+ * The value the stack distribution is centered on.
+ * Uses the user-defined target nominal when set, otherwise the sum of item nominals
+ * (which is 0 for stacks without nominals, matching the classic ±deviation usage).
+ */
+export function getStackCenter(items: ToleranceItem[], targetNominal?: number): number {
+  return targetNominal !== undefined && Number.isFinite(targetNominal)
+    ? targetNominal
+    : getStackNominal(items);
 }
 
 /**
@@ -34,11 +76,8 @@ function getItemFloatFactor(item: ToleranceItem): number {
  * RSS Formula: √(Σ((tolerance × float_factor)²))
  * Worst-Case Formula: Σ(tolerance × float_factor)
  *
- * @param items - Array of tolerance items
- * @param directionId - ID of the direction being calculated
- * @param directionName - Name of the direction being calculated
- * @param mode - Calculation mode: 'rss' (default) or 'worstCase'
- * @returns RSSResult with total tolerances and individual contributions
+ * Percent contributions are variance shares (c² / Σc²) in RSS mode and linear shares
+ * (c / Σc) in Worst-Case mode, so they always add up to 100%.
  */
 export function calculateTolerance(
   items: ToleranceItem[],
@@ -50,34 +89,34 @@ export function calculateTolerance(
   let sumOfSquaresMinus = 0;
   let worstCasePlus = 0;
   let worstCaseMinus = 0;
-  const itemContributions: RSSResult['itemContributions'] = [];
 
-  items.forEach((item) => {
-    // Determine float factor (supports both new and old format)
+  const raw = items.map((item) => {
     const floatFactor = getItemFloatFactor(item);
-
-    // Calculate contribution for this item (tolerance × float_factor)
     const contributionPlus = item.tolerancePlus * floatFactor;
     const contributionMinus = item.toleranceMinus * floatFactor;
 
-    // Add to sums for both calculation modes
     sumOfSquaresPlus += contributionPlus ** 2;
     sumOfSquaresMinus += contributionMinus ** 2;
     worstCasePlus += contributionPlus;
     worstCaseMinus += contributionMinus;
 
-    // Store individual contributions for display
-    itemContributions.push({
-      itemId: item.id,
-      itemName: item.name,
-      contributionPlus,
-      contributionMinus,
-    });
+    return { itemId: item.id, itemName: item.name, contributionPlus, contributionMinus };
   });
 
-  // Calculate based on mode
-  const totalPlus = mode === 'rss' ? Math.sqrt(sumOfSquaresPlus) : worstCasePlus;
-  const totalMinus = mode === 'rss' ? Math.sqrt(sumOfSquaresMinus) : worstCaseMinus;
+  const useVariance = mode !== 'worstCase';
+  const share = (value: number, sum: number, sumSq: number) => {
+    if (useVariance) return sumSq > 0 ? (value ** 2 / sumSq) * 100 : 0;
+    return sum > 0 ? (value / sum) * 100 : 0;
+  };
+
+  const itemContributions = raw.map((c) => ({
+    ...c,
+    percentPlus: share(c.contributionPlus, worstCasePlus, sumOfSquaresPlus),
+    percentMinus: share(c.contributionMinus, worstCaseMinus, sumOfSquaresMinus),
+  }));
+
+  const totalPlus = mode === 'worstCase' ? worstCasePlus : Math.sqrt(sumOfSquaresPlus);
+  const totalMinus = mode === 'worstCase' ? worstCaseMinus : Math.sqrt(sumOfSquaresMinus);
 
   return {
     directionId,
@@ -103,28 +142,12 @@ export function calculateRSS(
 }
 
 /**
- * Get the float factor constant (√3)
- * @deprecated Use FLOAT_FACTORS.SQRT3 instead
- */
-export function getFloatFactor(): number {
-  return FLOAT_FACTOR;
-}
-
-/**
  * Convert value from one unit to another
  */
 export function convertUnit(value: number, fromUnit: string, toUnit: string): number {
-  // Conversion factors to mm
-  const toMm: Record<string, number> = {
-    'mm': 1,
-    'inches': 25.4,
-    'μm': 0.001,
-    'mils': 0.0254,
-  };
-
-  // Convert to mm first, then to target unit
-  const valueInMm = value * (toMm[fromUnit] || 1);
-  return valueInMm / (toMm[toUnit] || 1);
+  const from = UNIT_TO_MM[fromUnit as ToleranceUnit] ?? 1;
+  const to = UNIT_TO_MM[toUnit as ToleranceUnit] ?? 1;
+  return (value * from) / to;
 }
 
 /**
@@ -142,79 +165,162 @@ export function formatWithMultiUnit(
 }
 
 /**
- * Calculate statistical analysis for tolerance results
- * Note: Input tolerances are assumed to represent 3σ values (industry standard)
+ * Evaluate one side of the stack against a specification limit.
  *
- * @param rssValue - The RSS total value (3σ)
- * @param targetBudget - Target tolerance budget
- * @returns Statistical analysis data showing current Cpk and required 3σ for capability targets
+ * margin      = distance from the stack center to the limit
+ * utilization = total / margin × 100
+ *
+ * With the center at 0 this reduces to total / |limit|, the classic ±budget check.
  */
-export function calculateStatisticalAnalysis(
-  rssValue: number,
-  targetBudget: number
-) {
-  // RSS result is 3σ (since input tolerances are 3σ)
-  const current3Sigma = rssValue;
+export function evaluateSpecLimit(
+  side: 'upper' | 'lower',
+  limit: number,
+  center: number,
+  total: number
+): SpecLimitStatus {
+  const margin = side === 'upper' ? limit - center : center - limit;
+  const extreme = side === 'upper' ? center + total : center - total;
+  const exceedsBy = Math.max(0, total - margin);
 
-  // Convert to 1σ for Cpk calculation
-  const oneSigma = current3Sigma / 3;
+  let utilization: number;
+  if (margin > 0) {
+    utilization = (total / margin) * 100;
+  } else {
+    utilization = total === 0 && margin === 0 ? 100 : Infinity;
+  }
 
-  // Current Process Capability Index (Cpk)
-  // Cpk = (USL - mean) / (3 * sigma)
-  // For centered process: Cpk = USL / (3 * sigma)
-  const currentCpk = targetBudget / (3 * oneSigma);
+  let status: SpecLimitStatus['status'] = 'pass';
+  if (utilization > SPEC_FAIL_THRESHOLD) status = 'fail';
+  else if (utilization >= SPEC_WARNING_THRESHOLD) status = 'warning';
 
-  // Estimated yield using normal distribution approximation
-  // Z-score = (targetBudget - 0) / oneSigma
-  const zScore = targetBudget / oneSigma;
-  const currentYield = normalCDF(zScore) * 100;
+  return { limit, margin, extreme, utilization, exceedsBy, status };
+}
 
-  // Calculate required 3σ values for target Cpk levels
-  // Rearranging Cpk = USL / (3 * sigma), we get: sigma = USL / (3 * Cpk)
-  // So 3σ = USL / Cpk
-  const required3SigmaFor1_33Cpk = targetBudget / 1.33;
-  const required3SigmaFor1_66Cpk = targetBudget / 1.66;
+/**
+ * Complementary error function.
+ * Chebyshev approximation (Numerical Recipes `erfcc`) with fractional error < 1.2e-7
+ * everywhere, so tail probabilities (PPM) stay accurate far from the mean.
+ */
+export function erfc(x: number): number {
+  const z = Math.abs(x);
+  const t = 1 / (1 + 0.5 * z);
+  const r =
+    t *
+    Math.exp(
+      -z * z -
+        1.26551223 +
+        t *
+          (1.00002368 +
+            t *
+              (0.37409196 +
+                t *
+                  (0.09678418 +
+                    t *
+                      (-0.18628806 +
+                        t *
+                          (0.27886807 +
+                            t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277))))))))
+    );
+  return x >= 0 ? r : 2 - r;
+}
 
+/**
+ * Standard normal cumulative distribution function, P(Z ≤ z)
+ */
+export function normalCDF(z: number): number {
+  return 0.5 * erfc(-z / Math.SQRT2);
+}
+
+/**
+ * Standard normal survival function, P(Z > z).
+ * Prefer this over 1 - normalCDF(z) for upper tails to avoid cancellation.
+ */
+export function normalSF(z: number): number {
+  return 0.5 * erfc(z / Math.SQRT2);
+}
+
+/**
+ * Probability of falling outside each specification limit for a normal distribution
+ */
+export function normalTailRisk(mean: number, sigma: number, usl?: number, lsl?: number) {
+  const outside = (beyond: boolean) => (beyond ? 1 : 0);
+  let probabilityExceedingUSL = 0;
+  let probabilityExceedingLSL = 0;
+
+  if (usl !== undefined) {
+    probabilityExceedingUSL = sigma > 0 ? normalSF((usl - mean) / sigma) : outside(mean > usl);
+  }
+  if (lsl !== undefined) {
+    probabilityExceedingLSL = sigma > 0 ? normalCDF((lsl - mean) / sigma) : outside(mean < lsl);
+  }
+
+  const probabilityOutOfSpec = Math.min(1, probabilityExceedingUSL + probabilityExceedingLSL);
   return {
-    current3Sigma,
-    currentCpk,
-    currentYield,
-    required3SigmaFor1_33Cpk,
-    required3SigmaFor1_66Cpk,
+    usl,
+    lsl,
+    probabilityExceedingUSL,
+    probabilityExceedingLSL,
+    probabilityOutOfSpec,
+    expectedDefectRate: probabilityOutOfSpec * 1_000_000,
   };
 }
 
 /**
- * Approximate normal cumulative distribution function
- * Uses the error function approximation
+ * Process capability for a stack whose total represents ±3σ.
  *
- * @param z - The z-score
- * @returns Probability (0 to 1)
+ * Cpu = (USL − μ) / 3σ, Cpl = (μ − LSL) / 3σ, Cpk = min(Cpu, Cpl), Cp = (USL − LSL) / 6σ.
+ * Returns undefined when neither limit is set.
  */
-export function normalCDF(z: number): number {
-  // Approximation using error function
-  // CDF(z) ≈ 0.5 * (1 + erf(z / sqrt(2)))
+export function calculateCapability(
+  total3Sigma: number,
+  center: number,
+  usl?: number,
+  lsl?: number
+): CapabilityAnalysis | undefined {
+  if (usl === undefined && lsl === undefined) return undefined;
 
-  // For positive z-scores, use approximation
-  if (z >= 0) {
-    const t = 1 / (1 + 0.2316419 * z);
-    const d = 0.3989423 * Math.exp(-z * z / 2);
-    const prob = 1 - d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
-    return prob;
-  } else {
-    // For negative z-scores, use symmetry
-    return 1 - normalCDF(-z);
-  }
+  const sigma = total3Sigma / 3;
+  const safeDiv = (num: number, den: number) => (den > 0 ? num / den : num >= 0 ? Infinity : -Infinity);
+
+  const cpu = usl !== undefined ? safeDiv(usl - center, 3 * sigma) : undefined;
+  const cpl = lsl !== undefined ? safeDiv(center - lsl, 3 * sigma) : undefined;
+  const cp = usl !== undefined && lsl !== undefined ? safeDiv(usl - lsl, 6 * sigma) : undefined;
+  const currentCpk = Math.min(cpu ?? Infinity, cpl ?? Infinity);
+
+  const risk = normalTailRisk(center, sigma, usl, lsl);
+
+  // Cpk = d / 3σ  →  required 3σ = d / Cpk, where d is the distance to the nearest limit
+  const nearest = Math.min(
+    usl !== undefined ? usl - center : Infinity,
+    lsl !== undefined ? center - lsl : Infinity
+  );
+  const required = (cpk: number) => Math.max(0, nearest / cpk);
+
+  return {
+    mean: center,
+    sigma,
+    current3Sigma: total3Sigma,
+    cp,
+    cpu,
+    cpl,
+    currentCpk,
+    currentYield: (1 - risk.probabilityOutOfSpec) * 100,
+    ppm: risk.expectedDefectRate,
+    required3SigmaFor1_33Cpk: required(1.33),
+    required3SigmaFor1_66Cpk: required(1.66),
+  };
+}
+
+/**
+ * Calculate statistical analysis for a symmetric ±budget centered at 0
+ * @deprecated Use calculateCapability() instead
+ */
+export function calculateStatisticalAnalysis(rssValue: number, targetBudget: number) {
+  return calculateCapability(rssValue, 0, targetBudget, -targetBudget)!;
 }
 
 /**
  * Normal probability density function (PDF)
- * Used to generate smooth distribution curves for visualization
- *
- * @param x - The value at which to evaluate the PDF
- * @param mean - The mean (μ) of the distribution
- * @param std - The standard deviation (σ) of the distribution
- * @returns The probability density at x
  */
 export function normalPdf(x: number, mean: number, std: number): number {
   const z = (x - mean) / std;
@@ -223,80 +329,70 @@ export function normalPdf(x: number, mean: number, std: number): number {
 
 /**
  * Generate theoretical RSS distribution curve data
- * Assumes RSS total represents ±3σ of a normal distribution
- *
- * @param rssTotal - The RSS total tolerance (represents ±3σ)
- * @param targetNominal - Target nominal dimension (defaults to 0, centers distribution)
- * @param usl - Upper Specification Limit (optional)
- * @param lsl - Lower Specification Limit (optional)
- * @param numPoints - Number of points to generate for the curve (default: 500)
- * @param customMinX - Custom minimum x value for range (optional)
- * @param customMaxX - Custom maximum x value for range (optional)
- * @returns Object with curve data and risk analysis
+ * Assumes RSS total represents ±3σ of a normal distribution centered on `center`
  */
 export function generateRSSDistribution(
   rssTotal: number,
-  targetNominal: number = 0,
+  center: number = 0,
   usl?: number,
   lsl?: number,
   numPoints: number = 500,
   customMinX?: number,
   customMaxX?: number
 ) {
-  // Assume RSS total is 3σ (99.7% confidence interval)
-  // Center distribution on target nominal
-  const mean = targetNominal;
+  const mean = center;
   const stdDev = rssTotal / 3;
 
-  // Calculate the range to display
   let minX: number;
   let maxX: number;
-
-  if (customMinX !== undefined && customMaxX !== undefined) {
-    // Use custom range if provided
+  if (customMinX !== undefined && customMaxX !== undefined && customMaxX > customMinX) {
     minX = customMinX;
     maxX = customMaxX;
   } else {
-    // Default: ±4σ for better visualization
-    const range = 4 * stdDev;
+    const range = 4 * (stdDev || 1);
     minX = mean - range;
     maxX = mean + range;
   }
 
   const step = (maxX - minX) / numPoints;
-
-  // Generate curve data points
   const curveData = [];
-  for (let i = 0; i <= numPoints; i++) {
-    const x = minX + i * step;
-    const pdf = normalPdf(x, mean, stdDev);
-    curveData.push({ x, pdf });
+  if (stdDev > 0) {
+    for (let i = 0; i <= numPoints; i++) {
+      const x = minX + i * step;
+      curveData.push({ x, pdf: normalPdf(x, mean, stdDev) });
+    }
   }
 
-  // Calculate probabilities of exceeding specification limits
-  let riskAnalysis;
-  if (usl !== undefined || lsl !== undefined) {
-    const probExceedingUSL = usl !== undefined ? 1 - normalCDF((usl - mean) / stdDev) : 0;
-    const probExceedingLSL = lsl !== undefined ? normalCDF((lsl - mean) / stdDev) : 0;
-    const probOutOfSpec = probExceedingUSL + probExceedingLSL;
-    const expectedDefectRate = probOutOfSpec * 1_000_000; // PPM
+  const riskAnalysis =
+    usl !== undefined || lsl !== undefined ? normalTailRisk(mean, stdDev, usl, lsl) : undefined;
 
-    riskAnalysis = {
-      usl,
-      lsl,
-      probabilityExceedingUSL: probExceedingUSL,
-      probabilityExceedingLSL: probExceedingLSL,
-      probabilityOutOfSpec: probOutOfSpec,
-      expectedDefectRate: expectedDefectRate,
-    };
+  return { mean, stdDev, curveData, riskAnalysis, minX, maxX };
+}
+
+/**
+ * "Nice" axis tick values between min and max, at most ~maxTicks of them.
+ * When `increment` is given it is used unless it would produce too many ticks.
+ */
+export function generateTicks(min: number, max: number, increment?: number, maxTicks: number = 12): number[] {
+  const range = max - min;
+  if (!Number.isFinite(range) || range <= 0) return [];
+
+  let step = increment && increment > 0 ? increment : 0;
+  if (!step || range / step > maxTicks * 4) {
+    const raw = range / 8;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
+    const normalized = raw / magnitude;
+    const nice = normalized < 1.5 ? 1 : normalized < 3 ? 2.5 : normalized < 7 ? 5 : 10;
+    step = nice * magnitude;
   }
 
-  return {
-    mean,
-    stdDev,
-    curveData,
-    riskAnalysis,
-    minX,
-    maxX,
-  };
+  const decimals = Math.max(0, -Math.floor(Math.log10(step)) + 3);
+  const ticks: number[] = [];
+  const start = Math.ceil(min / step) * step;
+  for (let i = 0; ; i++) {
+    const value = start + i * step;
+    if (value > max + step * 1e-9) break;
+    ticks.push(Number(value.toFixed(decimals)));
+  }
+  return ticks;
 }
