@@ -7,7 +7,11 @@ A professional web application for calculating **Root Sum Square (RSS)** toleran
 - **Multi-direction support**: Calculate tolerance stacks for multiple directions (B-Direction, H-Direction, etc.)
 - **Float factor**: Automatically multiply tolerances by √3 (≈1.7321) when marked as "float"
 - **Symmetric & Asymmetric modes**: Support both ±tolerances and separate +/- values
-- **Save/Load projects**: Export and import calculations as JSON files
+- **RSS, Worst-Case and Monte Carlo** calculation modes (Monte Carlo runs in a background worker, with an optional seed for reproducible runs)
+- **Specification limits & capability**: USL/LSL status measured from the stack center, Cp/Cpk, estimated yield and PPM
+- **Save/Load projects**: Export and import calculations as JSON files; work is also autosaved in the browser
+- **Undo/redo** (Ctrl/⌘+Z, Ctrl+Y / ⌘+Shift+Z) and keyboard shortcuts for save (Ctrl/⌘+S) and load (Ctrl/⌘+O)
+- **Reports & export**: printable HTML report (print to PDF) and CSV export
 - **Live calculations**: Results update automatically as you enter data
 - **Professional UI**: Clean Material-UI interface with tables and tabs
 
@@ -39,6 +43,14 @@ npm run build
 ```
 
 The built files will be in the `dist/` folder.
+
+### Running Tests
+
+```bash
+npm test
+```
+
+Unit tests (Vitest) cover the RSS/worst-case math, capability and tail-probability functions, the Monte Carlo engine, unit conversion, and project file parsing. CI runs the tests and the production build on every push and pull request.
 
 ## How to Use
 
@@ -109,10 +121,18 @@ rss-tool/
 │   │   ├── DirectionTab.tsx      # Single direction calculator
 │   │   ├── ToleranceTable.tsx    # Table of tolerance items
 │   │   ├── ResultsDisplay.tsx    # RSS calculation results
-│   │   └── FileControls.tsx      # Save/Load buttons
+│   │   ├── NumericField.tsx      # Number input that tolerates partial typing
+│   │   └── FileControls.tsx      # New/Save/Load/Export/Undo toolbar
+│   ├── hooks/
+│   │   └── useHistoryState.ts    # Undo/redo state
 │   ├── utils/
-│   │   ├── rssCalculator.ts      # RSS calculation logic
-│   │   └── fileHandlers.ts       # JSON import/export
+│   │   ├── rssCalculator.ts      # RSS, spec limits, capability, normal CDF
+│   │   ├── monteCarloCalculator.ts # Seeded Monte Carlo engine
+│   │   ├── monteCarloRunner.ts   # Runs the engine in a Web Worker
+│   │   ├── projectDefaults.ts    # Defaults, IDs, unit conversion
+│   │   ├── reportGenerator.ts    # Printable HTML report
+│   │   ├── fileHandlers.ts       # JSON import/export, CSV export
+│   │   └── __tests__/            # Vitest unit tests
 │   ├── types/
 │   │   └── index.ts              # TypeScript interfaces
 │   ├── App.tsx                   # Main application

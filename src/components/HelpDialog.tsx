@@ -192,7 +192,9 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                   <Box component="ul" sx={{ pl: 2, mt: 0 }}>
                     <li>Each tolerance item is sampled from a probability distribution</li>
                     <li>Deviations add algebraically (linear sum) for each sample (default: 50,000 iterations)</li>
-                    <li>Results aggregated into bilateral histogram and percentile statistics</li>
+                    <li>Samples are offset by the stack center, so results are in the same coordinates as USL/LSL</li>
+                    <li>Asymmetric tolerances (+a/−b) are sampled within [−b, +a] with a mean shift of (a − b)/2</li>
+                    <li>Runs in the background, so editing stays responsive; set a random seed in Settings for repeatable results</li>
                   </Box>
                 </Box>
 
@@ -202,7 +204,7 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                   </Typography>
                   <Box component="ul" sx={{ pl: 2, mt: 0 }}>
                     <li><strong>Normal:</strong> Used for controlled manufacturing processes (default for fixed items)</li>
-                    <li><strong>Uniform:</strong> Equal probability across tolerance range (default for floating items)</li>
+                    <li><strong>Uniform:</strong> Equal probability across tolerance range (default for floating items). A uniform ±t has σ = t/√3, which is exactly why RSS multiplies floating items by √3 — so the float factor is not applied again on top of it</li>
                     <li><strong>Triangular:</strong> Most likely at center, decreasing toward limits</li>
                   </Box>
                 </Box>
@@ -213,9 +215,10 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                   </Typography>
                   <Box component="ul" sx={{ pl: 2, mt: 0 }}>
                     <li><strong>±3σ Range:</strong> Captures 99.7% of all assemblies (shown in main result)</li>
-                    <li><strong>Median (50th):</strong> Typical assembly deviation (should be near zero)</li>
-                    <li><strong>Bilateral Histogram:</strong> Shows both positive and negative deviations</li>
-                    <li><strong>Risk Analysis:</strong> Probability of exceeding ±budget limits (LSL/USL)</li>
+                    <li><strong>Median (50th):</strong> Typical assembly value (near the stack center for symmetric tolerances)</li>
+                    <li><strong>Histogram:</strong> Shows the actual simulated distribution shape</li>
+                    <li><strong>Risk Analysis:</strong> Fraction of samples beyond USL/LSL (zero samples out does not mean zero risk — use RSS mode for tail estimates)</li>
+                    <li><strong>% of Variance:</strong> Each item's share of the total simulated variance</li>
                   </Box>
                 </Box>
 
@@ -340,15 +343,25 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
             </AccordionDetails>
           </Accordion>
 
-          {/* Budget Comparison */}
+          {/* Specification Limits */}
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="h6">Tolerance Budget</Typography>
+              <Typography variant="h6">Specification Limits (USL/LSL) &amp; Stack Center</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Typography variant="body2">
-                  Set a target tolerance budget to track how your design compares to requirements.
+                  <strong>Stack center</strong> is the value the stack distribution is centered on: the
+                  <strong> Target Nominal</strong> when you enter one, otherwise the sum of all item nominals
+                  (which is 0 if you only enter tolerances). A warning appears when the target and Σ nominals disagree.
+                </Typography>
+                <Typography variant="body2">
+                  <strong>USL / LSL</strong> are compared in the same coordinates as the stack center. If you work in
+                  deviations (all nominals 0, no target), enter limits as deviations, e.g. USL = +0.5, LSL = −0.5.
+                  If you enter real dimensions, enter absolute limits, e.g. target 10.0, USL 10.5, LSL 9.5.
+                </Typography>
+                <Typography variant="body2">
+                  Each limit is checked independently: <em>utilization = stack total ÷ (distance from center to limit)</em>.
                 </Typography>
 
                 <TableContainer component={Paper} variant="outlined">
@@ -361,17 +374,17 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                       </TableRow>
                       <TableRow>
                         <TableCell>Pass</TableCell>
-                        <TableCell>&lt; 90% of budget</TableCell>
+                        <TableCell>&lt; 90% of margin</TableCell>
                         <TableCell sx={{ color: 'success.main' }}>Green</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell>Warning</TableCell>
-                        <TableCell>90-100% of budget</TableCell>
+                        <TableCell>90-100% of margin</TableCell>
                         <TableCell sx={{ color: 'warning.main' }}>Yellow</TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell>Fail</TableCell>
-                        <TableCell>&gt; 100% of budget</TableCell>
+                        <TableCell>&gt; 100% of margin, or center outside the limit</TableCell>
                         <TableCell sx={{ color: 'error.main' }}>Red</TableCell>
                       </TableRow>
                     </TableBody>
@@ -379,7 +392,8 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                 </TableContainer>
 
                 <Typography variant="body2">
-                  Enter your target budget in the "Target Budget" field for each tolerance stack.
+                  In RSS mode the <strong>Process Capability</strong> section reports Cp = (USL − LSL)/6σ,
+                  Cpk = min(USL − μ, μ − LSL)/3σ, the estimated yield and defect rate (PPM), treating the RSS total as 3σ.
                 </Typography>
               </Box>
             </AccordionDetails>
@@ -419,7 +433,17 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
             <AccordionDetails>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Typography variant="body2">
-                  <strong>Save:</strong> Exports your project as a JSON file for later use
+                  <strong>Autosave:</strong> Your work is saved in this browser automatically and restored next time.
+                  Use Save to keep a project file you can share or archive.
+                </Typography>
+
+                <Typography variant="body2">
+                  <strong>New:</strong> Starts an empty project
+                </Typography>
+
+                <Typography variant="body2">
+                  <strong>Save:</strong> Exports your project as a JSON file (named after the project and revision).
+                  A • on the button means there are changes not yet saved to a file.
                 </Typography>
 
                 <Typography variant="body2">
@@ -431,8 +455,18 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
                 </Typography>
 
                 <Typography variant="body2">
+                  <strong>Report:</strong> Opens a printable report of every stack (results, spec limit status, capability, items).
+                  Use your browser's print dialog to save it as PDF.
+                </Typography>
+
+                <Typography variant="body2">
                   <strong>Import from CSV:</strong> Import tolerance items from a CSV file with column mapping support.
                   Available in each tolerance stack tab.
+                </Typography>
+
+                <Typography variant="body2">
+                  <strong>Keyboard shortcuts:</strong> Ctrl/⌘+Z undo, Ctrl+Y or ⌘+Shift+Z redo, Ctrl/⌘+S save,
+                  Ctrl/⌘+O load. In number fields, ↑/↓ step the value. Double-click a stack tab to rename it.
                 </Typography>
               </Box>
             </AccordionDetails>

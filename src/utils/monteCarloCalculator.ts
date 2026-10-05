@@ -1,132 +1,172 @@
-import { ToleranceItem, MonteCarloResult, MonteCarloSettings, DistributionType, HistogramBin, PercentileData } from '../types';
+import {
+  ToleranceItem,
+  MonteCarloResult,
+  MonteCarloSettings,
+  DistributionType,
+  HistogramBin,
+  PercentileData,
+} from '../types';
+import { getItemFloatFactor, FLOAT_FACTORS } from './rssCalculator';
+
+/** Random number generator returning values in [0, 1) */
+export type RandomFn = () => number;
 
 /**
- * Generate random sample from normal distribution using Box-Muller transform
- * Returns signed value (can be positive or negative)
+ * Small, fast seeded PRNG (mulberry32). Same seed → same sequence.
  */
-function generateNormal(mean: number, stdDev: number): number {
-  const u1 = Math.random();
-  const u2 = Math.random();
-  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  return mean + z0 * stdDev;
+export function createSeededRandom(seed: number): RandomFn {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 /**
- * Generate random sample from uniform distribution
+ * Standard normal sample via Box-Muller transform
  */
-function generateUniform(min: number, max: number): number {
-  return min + Math.random() * (max - min);
+function standardNormal(rng: RandomFn): number {
+  const u1 = 1 - rng(); // (0, 1] so log() is finite
+  const u2 = rng();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
 /**
- * Generate random sample from triangular distribution
- * Mode is at center: (min + max) / 2
+ * Symmetric triangular sample on [-1, 1] with mode 0
  */
-function generateTriangular(min: number, max: number): number {
-  const u = Math.random();
-  const mode = (min + max) / 2;
-  const fc = (mode - min) / (max - min);
-
-  if (u < fc) {
-    return min + Math.sqrt(u * (max - min) * (mode - min));
-  } else {
-    return max - Math.sqrt((1 - u) * (max - min) * (max - mode));
-  }
+function standardTriangular(rng: RandomFn): number {
+  return rng() + rng() - 1;
 }
 
 /**
- * Determine distribution type for an item
- * Auto mode: Normal for fixed (floatFactor=1.0), Uniform for floating (floatFactor≈√3)
+ * Determine distribution type for an item.
+ * Auto mode: Uniform for floating items (floatFactor ≈ √3), Normal otherwise.
  */
-function getDistributionType(item: ToleranceItem, useAdvanced: boolean): DistributionType {
+export function getDistributionType(item: ToleranceItem, useAdvanced: boolean): DistributionType {
   if (useAdvanced && item.distributionType) {
     return item.distributionType;
   }
-
-  // Auto mode: Normal for fixed items, Uniform for floating items
-  const SQRT3 = Math.sqrt(3);
-  const isFloating = Math.abs(item.floatFactor - SQRT3) < 0.01;
+  const isFloating = Math.abs(getItemFloatFactor(item) - FLOAT_FACTORS.SQRT3) < 0.01;
   return isFloating ? 'uniform' : 'normal';
 }
 
 /**
- * Sample a single tolerance value from its distribution
- * Returns signed value (positive or negative deviation from nominal)
+ * How an item is sampled: deviation = shift + scale × standard sample.
+ *
+ * Asymmetric tolerances (+a / −b) are modelled as a mean shift of (a − b) / 2 with a
+ * symmetric half-width of (a + b) / 2, so samples stay within [−b, +a].
+ *
+ * In auto mode the float factor is honoured so the simulated σ matches RSS:
+ *  - floating (√3) items are uniform on ±t, whose σ = t/√3 = (√3·t)/3, exactly RSS's
+ *    floating contribution treated as 3σ, so no extra factor is applied;
+ *  - other items are normal with 3σ = t × floatFactor.
+ * In advanced mode the chosen distribution replaces the float factor.
  */
-function sampleTolerance(
-  item: ToleranceItem,
-  distributionType: DistributionType,
-  isPlus: boolean
-): number {
-  const tolerance = isPlus ? item.tolerancePlus : item.toleranceMinus;
+interface ItemSampler {
+  item: ToleranceItem;
+  distribution: DistributionType;
+  shift: number;
+  scale: number;
+  min: number; // Histogram range
+  max: number;
+}
 
-  if (tolerance === 0) return 0;
+function buildSampler(item: ToleranceItem, useAdvanced: boolean): ItemSampler {
+  const distribution = getDistributionType(item, useAdvanced);
+  const plus = Math.max(0, item.tolerancePlus || 0);
+  const minus = Math.max(0, item.toleranceMinus || 0);
+  const shift = (plus - minus) / 2;
+  let halfWidth = (plus + minus) / 2;
 
-  switch (distributionType) {
-    case 'normal':
-      // Assume tolerance is 3σ, so σ = tolerance/3
-      // Sample from N(0, σ) - can be positive or negative
-      const sigma = tolerance / 3;
-      return generateNormal(0, sigma);
+  if (!useAdvanced && distribution === 'normal') {
+    halfWidth *= getItemFloatFactor(item);
+  }
 
+  const scale = distribution === 'normal' ? halfWidth / 3 : halfWidth;
+  const extent = distribution === 'normal' ? 4 * scale : halfWidth;
+
+  return { item, distribution, shift, scale, min: shift - extent, max: shift + extent };
+}
+
+function sample(sampler: ItemSampler, rng: RandomFn): number {
+  if (sampler.scale === 0) return sampler.shift;
+  switch (sampler.distribution) {
     case 'uniform':
-      // Sample uniformly between -tolerance and +tolerance
-      return generateUniform(-tolerance, tolerance);
-
+      return sampler.shift + sampler.scale * (2 * rng() - 1);
     case 'triangular':
-      // Triangular from -tolerance to +tolerance, mode at 0
-      return generateTriangular(-tolerance, tolerance);
-
+      return sampler.shift + sampler.scale * standardTriangular(rng);
+    case 'normal':
     default:
-      return tolerance;
+      return sampler.shift + sampler.scale * standardNormal(rng);
   }
 }
 
-/**
- * Create histogram bins from samples
- */
-function createHistogram(samples: number[], numBins: number): HistogramBin[] {
-  if (samples.length === 0) return [];
-
-  const min = Math.min(...samples);
-  const max = Math.max(...samples);
-  const binWidth = (max - min) / numBins;
-
-  const bins: HistogramBin[] = Array.from({ length: numBins }, (_, i) => ({
-    binStart: min + i * binWidth,
-    binEnd: min + (i + 1) * binWidth,
-    binCenter: min + (i + 0.5) * binWidth,
+function emptyBins(min: number, max: number, numBins: number): HistogramBin[] {
+  // Degenerate range (all samples identical): give it a tiny width so the bar is visible
+  if (!(max > min)) {
+    const pad = Math.abs(min) * 1e-3 || 1e-3;
+    min -= pad;
+    max += pad;
+  }
+  const width = (max - min) / numBins;
+  return Array.from({ length: numBins }, (_, i) => ({
+    binStart: min + i * width,
+    binEnd: min + (i + 1) * width,
+    binCenter: min + (i + 0.5) * width,
     count: 0,
     frequency: 0,
   }));
+}
 
-  // Count samples in each bin
-  samples.forEach(value => {
-    const binIndex = Math.min(Math.floor((value - min) / binWidth), numBins - 1);
-    bins[binIndex].count++;
+function addToBins(bins: HistogramBin[], value: number) {
+  const min = bins[0].binStart;
+  const width = bins[0].binEnd - bins[0].binStart;
+  const index = Math.floor((value - min) / width);
+  bins[Math.max(0, Math.min(bins.length - 1, index))].count++;
+}
+
+function normalizeBins(bins: HistogramBin[], total: number) {
+  bins.forEach((bin) => {
+    bin.frequency = total > 0 ? bin.count / total : 0;
   });
+}
 
-  // Normalize frequencies
-  bins.forEach(bin => {
-    bin.frequency = bin.count / samples.length;
-  });
-
+/**
+ * Create histogram bins from samples (single pass for min/max; safe for very large arrays)
+ */
+export function createHistogram(samples: ArrayLike<number>, numBins: number): HistogramBin[] {
+  if (samples.length === 0) return [];
+  let min = Infinity;
+  let max = -Infinity;
+  for (let i = 0; i < samples.length; i++) {
+    if (samples[i] < min) min = samples[i];
+    if (samples[i] > max) max = samples[i];
+  }
+  const bins = emptyBins(min, max, numBins);
+  for (let i = 0; i < samples.length; i++) addToBins(bins, samples[i]);
+  normalizeBins(bins, samples.length);
   return bins;
 }
 
 /**
  * Calculate percentiles from sorted samples
  */
-function calculatePercentiles(sortedSamples: number[]): PercentileData {
+export function calculatePercentiles(sortedSamples: ArrayLike<number>): PercentileData {
   const n = sortedSamples.length;
   const getPercentile = (p: number) => {
     const index = Math.ceil((p / 100) * n) - 1;
     return sortedSamples[Math.max(0, Math.min(index, n - 1))];
   };
 
-  const mean = sortedSamples.reduce((sum, x) => sum + x, 0) / n;
-  const variance = sortedSamples.reduce((sum, x) => sum + (x - mean) ** 2, 0) / n;
-  const stdDev = Math.sqrt(variance);
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += sortedSamples[i];
+  const mean = sum / n;
+  let sq = 0;
+  for (let i = 0; i < n; i++) sq += (sortedSamples[i] - mean) ** 2;
+  const stdDev = Math.sqrt(sq / n);
 
   return {
     p5: getPercentile(5),
@@ -139,7 +179,10 @@ function calculatePercentiles(sortedSamples: number[]): PercentileData {
 }
 
 /**
- * Run Monte Carlo simulation
+ * Run Monte Carlo simulation.
+ *
+ * Each iteration samples every item's deviation and sums them linearly; the stack value is
+ * `center + Σ deviations`, so results are in the same coordinates as USL/LSL.
  */
 export function runMonteCarloSimulation(
   items: ToleranceItem[],
@@ -147,101 +190,71 @@ export function runMonteCarloSimulation(
   directionName: string,
   settings: MonteCarloSettings,
   usl?: number,
-  lsl?: number
+  lsl?: number,
+  center: number = 0
 ): MonteCarloResult {
-  const { iterations, useAdvancedDistributions } = settings;
+  const iterations = Math.max(1, Math.floor(settings.iterations || 1));
+  const seed = settings.seed ?? Math.floor(Math.random() * 2 ** 32);
+  const rng = createSeededRandom(seed);
 
-  // Storage for results
-  const stackSamples: number[] = [];
-  const itemSamplesMap = new Map<string, number[]>();
+  const samplers = items.map((item) => buildSampler(item, settings.useAdvancedDistributions));
+  const itemBins = samplers.map((s) => emptyBins(s.min, s.max, 30));
+  const itemSum = new Float64Array(items.length);
+  const itemSumSq = new Float64Array(items.length);
+  const stackSamples = new Float64Array(iterations);
 
-  // Initialize item sample arrays
-  items.forEach(item => {
-    itemSamplesMap.set(item.id, []);
-  });
-
-  // Run simulation iterations
   for (let i = 0; i < iterations; i++) {
-    let totalDeviation = 0;
-
-    items.forEach(item => {
-      const distributionType = getDistributionType(item, useAdvancedDistributions);
-
-      // Sample tolerance value (signed deviation from nominal)
-      const sampledTolerance = sampleTolerance(item, distributionType, true);
-
-      // Store sample for item histogram
-      itemSamplesMap.get(item.id)!.push(sampledTolerance);
-
-      // Calculate contribution with float factor (signed sum, not RSS)
-      const contribution = sampledTolerance * item.floatFactor;
-
-      // Linear accumulation: deviations add algebraically
-      totalDeviation += contribution;
-    });
-
-    // Store total deviation (can be positive or negative)
-    stackSamples.push(totalDeviation);
+    let total = center;
+    for (let j = 0; j < samplers.length; j++) {
+      const deviation = sample(samplers[j], rng);
+      itemSum[j] += deviation;
+      itemSumSq[j] += deviation * deviation;
+      addToBins(itemBins[j], deviation);
+      total += deviation;
+    }
+    stackSamples[i] = total;
   }
 
-  // Sort samples for percentile calculation
-  const sortedSamples = [...stackSamples].sort((a, b) => a - b);
-  const percentiles = calculatePercentiles(sortedSamples);
-
-  // Create histogram for final stack (50 bins)
   const histogram = createHistogram(stackSamples, 50);
+  const sorted = stackSamples.slice().sort();
+  const percentiles = calculatePercentiles(sorted);
 
-  // Create histograms for individual items (30 bins each)
   const itemHistograms = new Map<string, HistogramBin[]>();
-  items.forEach(item => {
-    const itemSamples = itemSamplesMap.get(item.id)!;
-    itemHistograms.set(item.id, createHistogram(itemSamples, 30));
+  const stats = items.map((item, j) => {
+    normalizeBins(itemBins[j], iterations);
+    itemHistograms.set(item.id, itemBins[j]);
+    const mean = itemSum[j] / iterations;
+    const variance = Math.max(0, itemSumSq[j] / iterations - mean * mean);
+    return { item, mean, variance };
   });
+  const totalVariance = stats.reduce((sum, s) => sum + s.variance, 0);
 
-  // Calculate item contributions (mean and stdDev of each item's samples)
-  const itemContributions = items.map(item => {
-    const samples = itemSamplesMap.get(item.id)!;
-    const mean = samples.reduce((sum, x) => sum + x, 0) / samples.length;
-    const variance = samples.reduce((sum, x) => sum + (x - mean) ** 2, 0) / samples.length;
-    const stdDev = Math.sqrt(variance);
-    const weightedMean = mean * item.floatFactor;
-    const percentContribution = (weightedMean / percentiles.mean) * 100;
+  const itemContributions = stats.map(({ item, mean, variance }) => ({
+    itemId: item.id,
+    itemName: item.name,
+    mean,
+    stdDev: Math.sqrt(variance),
+    percentContribution: totalVariance > 0 ? (variance / totalVariance) * 100 : 0,
+  }));
 
-    return {
-      itemId: item.id,
-      itemName: item.name,
-      mean: weightedMean,
-      stdDev: stdDev * item.floatFactor,
-      percentContribution,
-    };
-  });
-
-  // Risk analysis (if specification limits provided)
-  let riskAnalysis;
+  let riskAnalysis: MonteCarloResult['riskAnalysis'];
   if (usl !== undefined || lsl !== undefined) {
-    // Count samples exceeding USL (values greater than upper limit)
-    const exceedingUSL = usl !== undefined
-      ? stackSamples.filter(x => x > usl).length
-      : 0;
-    const probabilityExceedingUSL = exceedingUSL / iterations;
-
-    // Count samples exceeding LSL (values less than lower limit)
-    const exceedingLSL = lsl !== undefined
-      ? stackSamples.filter(x => x < lsl).length
-      : 0;
-    const probabilityExceedingLSL = exceedingLSL / iterations;
-
-    // Total out-of-spec probability (either side)
+    let above = 0;
+    let below = 0;
+    for (let i = 0; i < iterations; i++) {
+      if (usl !== undefined && stackSamples[i] > usl) above++;
+      else if (lsl !== undefined && stackSamples[i] < lsl) below++;
+    }
+    const probabilityExceedingUSL = above / iterations;
+    const probabilityExceedingLSL = below / iterations;
     const probabilityOutOfSpec = probabilityExceedingUSL + probabilityExceedingLSL;
-    const expectedDefectRate = probabilityOutOfSpec * 1_000_000; // PPM
-
     riskAnalysis = {
-      usl: usl !== undefined ? usl : undefined,
-      lsl: lsl !== undefined ? lsl : undefined,
+      usl,
+      lsl,
       probabilityExceedingUSL,
       probabilityExceedingLSL,
       probabilityOutOfSpec,
-      expectedDefectRate,
+      expectedDefectRate: probabilityOutOfSpec * 1_000_000,
     };
   }
 
@@ -249,7 +262,8 @@ export function runMonteCarloSimulation(
     directionId,
     directionName,
     iterations,
-    samples: stackSamples,
+    seed,
+    center,
     percentiles,
     histogram,
     itemHistograms,

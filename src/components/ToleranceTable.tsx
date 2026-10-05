@@ -25,9 +25,13 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import NotesIcon from '@mui/icons-material/Notes';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { ToleranceItem, ToleranceMode, CalculationMode } from '../types';
-import { FLOAT_FACTORS } from '../utils/rssCalculator';
-import { MONOSPACE_FONT } from '../App';
+import { FLOAT_FACTORS, getStackNominal, isFloatingItem } from '../utils/rssCalculator';
+import { createDefaultItem, generateId } from '../utils/projectDefaults';
+import NumericField from './NumericField';
+import { MONOSPACE_FONT } from '../theme';
 import ImageUpload from './ImageUpload';
 
 interface ToleranceTableProps {
@@ -59,22 +63,25 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
 
   const handleSaveNotes = () => {
     if (editingItem) {
-      handleItemChange(editingItem.id, 'notes', editNotes);
-      handleItemChange(editingItem.id, 'source', editSource);
+      // Update both fields in one change so neither overwrites the other
+      updateItem(editingItem.id, {
+        notes: editNotes.trim() || undefined,
+        source: editSource.trim() || undefined,
+      });
     }
     setNotesDialogOpen(false);
   };
 
   const handleAddItem = () => {
-    const newItem: ToleranceItem = {
-      id: `item-${Date.now()}`,
-      name: `Item ${items.length + 1}`,
-      nominal: 0,
-      tolerancePlus: 0.5,
-      toleranceMinus: 0.5,
-      floatFactor: FLOAT_FACTORS.FIXED,
-    };
-    onItemsChange([...items, newItem]);
+    onItemsChange([...items, createDefaultItem(items.length + 1)]);
+  };
+
+  const handleMoveItem = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return;
+    const newItems = [...items];
+    [newItems[index], newItems[target]] = [newItems[target], newItems[index]];
+    onItemsChange(newItems);
   };
 
   const handleDeleteItem = (id: string) => {
@@ -87,7 +94,7 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
 
     const duplicatedItem: ToleranceItem = {
       ...item,
-      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: generateId('item'),
       name: `${item.name} (Copy)`,
     };
 
@@ -98,24 +105,22 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
     onItemsChange(newItems);
   };
 
-  const handleItemChange = (
-    id: string,
-    field: keyof ToleranceItem,
-    value: string | number | boolean
-  ) => {
+  const updateItem = (id: string, changes: Partial<ToleranceItem>) => {
     onItemsChange(
       items.map((item) => {
-        if (item.id === id) {
-          const updatedItem = { ...item, [field]: value };
-          // In symmetric mode, keep plus and minus the same
-          if (toleranceMode === 'symmetric' && field === 'tolerancePlus') {
-            updatedItem.toleranceMinus = value as number;
-          }
-          return updatedItem;
+        if (item.id !== id) return item;
+        const updatedItem = { ...item, ...changes };
+        // In symmetric mode, keep plus and minus the same
+        if (toleranceMode === 'symmetric' && changes.tolerancePlus !== undefined) {
+          updatedItem.toleranceMinus = changes.tolerancePlus;
         }
-        return item;
+        return updatedItem;
       })
     );
+  };
+
+  const handleItemChange = <K extends keyof ToleranceItem>(id: string, field: K, value: ToleranceItem[K]) => {
+    updateItem(id, { [field]: value } as Partial<ToleranceItem>);
   };
 
   const handleImageUpload = (itemId: string, file: File) => {
@@ -155,8 +160,15 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id}>
+            {items.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                  No items yet — click “Add Row” or import from CSV.
+                </TableCell>
+              </TableRow>
+            )}
+            {items.map((item, index) => (
+              <TableRow key={item.id} hover>
                 <TableCell>
                   <TextField
                     value={item.name}
@@ -166,47 +178,36 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                   />
                 </TableCell>
                 <TableCell align="right">
-                  <TextField
-                    type="number"
+                  <NumericField
                     value={item.nominal ?? 0}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0;
-                      handleItemChange(item.id, 'nominal', value);
-                    }}
+                    onChange={(value) => handleItemChange(item.id, 'nominal', value ?? 0)}
                     size="small"
-                    inputProps={{ step: 0.001 }}
-                    sx={{ width: 100, '& input': { fontFamily: MONOSPACE_FONT } }}
+                    step={0.001}
+                    inputProps={{ 'aria-label': `${item.name} nominal` }}
+                    sx={{ width: 100, '& input': { fontFamily: MONOSPACE_FONT, textAlign: 'right' } }}
                   />
                 </TableCell>
                 <TableCell align="right">
-                  <TextField
-                    type="number"
+                  <NumericField
                     value={item.tolerancePlus}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0;
-                      handleItemChange(item.id, 'tolerancePlus', Math.max(0, value));
-                    }}
+                    onChange={(value) => handleItemChange(item.id, 'tolerancePlus', value ?? 0)}
                     size="small"
-                    inputProps={{ step: 0.01, min: 0 }}
-                    error={item.tolerancePlus < 0}
-                    helperText={item.tolerancePlus < 0 ? 'Must be ≥ 0' : ''}
-                    sx={{ '& input': { fontFamily: MONOSPACE_FONT } }}
+                    min={0}
+                    step={0.01}
+                    inputProps={{ 'aria-label': `${item.name} tolerance plus` }}
+                    sx={{ width: 100, '& input': { fontFamily: MONOSPACE_FONT, textAlign: 'right' } }}
                   />
                 </TableCell>
                 {toleranceMode === 'asymmetric' && (
                   <TableCell align="right">
-                    <TextField
-                      type="number"
+                    <NumericField
                       value={item.toleranceMinus}
-                      onChange={(e) => {
-                        const value = parseFloat(e.target.value) || 0;
-                        handleItemChange(item.id, 'toleranceMinus', Math.max(0, value));
-                      }}
+                      onChange={(value) => handleItemChange(item.id, 'toleranceMinus', value ?? 0)}
                       size="small"
-                      inputProps={{ step: 0.01, min: 0 }}
-                      error={item.toleranceMinus < 0}
-                      helperText={item.toleranceMinus < 0 ? 'Must be ≥ 0' : ''}
-                      sx={{ '& input': { fontFamily: MONOSPACE_FONT } }}
+                      min={0}
+                      step={0.01}
+                      inputProps={{ 'aria-label': `${item.name} tolerance minus` }}
+                      sx={{ width: 100, '& input': { fontFamily: MONOSPACE_FONT, textAlign: 'right' } }}
                     />
                   </TableCell>
                 )}
@@ -214,7 +215,8 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                   <TableCell align="center">
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                       <Checkbox
-                        checked={item.floatFactor > 1.5}
+                        checked={isFloatingItem(item)}
+                        inputProps={{ 'aria-label': `${item.name} floating` }}
                         onChange={(e) => handleItemChange(
                           item.id,
                           'floatFactor',
@@ -223,7 +225,7 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                         size="small"
                       />
                       <Typography variant="caption" color="text.secondary">
-                        {item.floatFactor > 1.5 ? `(${FLOAT_FACTORS.SQRT3.toFixed(3)})` : '(1.0)'}
+                        ({item.floatFactor === 1 ? '1.0' : item.floatFactor.toFixed(3)})
                       </Typography>
                     </Box>
                   </TableCell>
@@ -232,7 +234,7 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                   <TableCell align="center">
                     <Select
                       value={item.distributionType || 'normal'}
-                      onChange={(e) => handleItemChange(item.id, 'distributionType', e.target.value)}
+                      onChange={(e) => handleItemChange(item.id, 'distributionType', e.target.value as ToleranceItem['distributionType'])}
                       size="small"
                       sx={{ width: 110 }}
                     >
@@ -248,8 +250,22 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                     imageUrl={item.imageUrl}
                   />
                 </TableCell>
-                <TableCell align="center">
-                  <Tooltip title="Add notes/source">
+                <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                  <Tooltip title="Move up">
+                    <span>
+                      <IconButton size="small" onClick={() => handleMoveItem(index, -1)} disabled={index === 0} aria-label="Move up">
+                        <ArrowUpwardIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Move down">
+                    <span>
+                      <IconButton size="small" onClick={() => handleMoveItem(index, 1)} disabled={index === items.length - 1} aria-label="Move down">
+                        <ArrowDownwardIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title={item.notes || item.source ? [item.source, item.notes].filter(Boolean).join(' — ') : 'Add notes/source'}>
                     <IconButton
                       onClick={() => handleOpenNotes(item)}
                       size="small"
@@ -266,21 +282,23 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
                       <ContentCopyIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <IconButton
-                    onClick={() => handleDeleteItem(item.id)}
-                    color="error"
-                    size="small"
-                    title="Delete item"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
+                  <Tooltip title="Delete item">
+                    <IconButton
+                      onClick={() => handleDeleteItem(item.id)}
+                      color="error"
+                      size="small"
+                      aria-label="Delete item"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
-      <Box mt={1}>
+      <Box mt={1} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -289,6 +307,11 @@ const ToleranceTable: React.FC<ToleranceTableProps> = ({
         >
           Add Row
         </Button>
+        {items.length > 0 && (
+          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: MONOSPACE_FONT }}>
+            {items.length} item{items.length === 1 ? '' : 's'} · Σ nominal = {getStackNominal(items).toFixed(4)}
+          </Typography>
+        )}
       </Box>
 
       {/* Notes/Source Dialog */}
